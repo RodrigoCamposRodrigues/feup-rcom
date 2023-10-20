@@ -5,12 +5,23 @@
 // MISC
 #define _POSIX_SOURCE 1 // POSIX compliant source
 
+struct termios oldtio, newtio;
+
+int alarmEnabled = FALSE;
+int alarmCount = 0;
+int alarm_reached_end = TRUE;
+int STOP = FALSE;
+int state = 0;
+int READ_SUCCESS = FALSE;
+unsigned char info_frame_number = I0;
+
 ////////////////////////////////////////////////
 // LLOPEN
 ////////////////////////////////////////////////
 int llopen(LinkLayer connectionParameters)
 {
     // TODO
+    LinkLayerState state = START;
 
     return 1;
 }
