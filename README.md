@@ -1,1 +1,1 @@
-# feup-rcom
+# Repositório de Redes de Computadores
