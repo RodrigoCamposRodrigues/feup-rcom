@@ -86,4 +86,10 @@ int llread(unsigned char *packet);
 // Return "1" on success or "-1" on error.
 int llclose(int showStatistics);
 
+int connect_to_serialPort(const char *serialPort);
+
+void alarmHandler(int signal);
+
+unsigned char *buildSupervisionFrame(unsigned char A, unsigned char C);
+
 #endif // _LINK_LAYER_H_
