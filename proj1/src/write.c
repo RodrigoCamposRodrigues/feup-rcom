@@ -358,6 +358,5 @@ unsigned char buildBCC2(unsigned char *buffer, int length){
         BCC2 ^= buffer[i];
     }
 
-    return BCC2;
-    
+    return BCC2;   
 }

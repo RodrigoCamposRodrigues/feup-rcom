@@ -23,12 +23,13 @@ typedef enum
 typedef enum
 {
    START,
-   FLAG_RCV,
-   A_RCV,
-   C_RCV,
+   FLAG_RECEIVED,
+   A_RECEIVED,
+   C_RECEIVED,
    BCC1_CHECKED,
    FOUND_ESC,
    READING_DATA,
+   STOP_READING,
    DISCONNECTED,
    BCC2_CHECKED
 } LinkLayerState;
@@ -75,7 +76,7 @@ int llopen(LinkLayer connectionParameters);
 
 // Send data in buf with size bufSize.
 // Return number of chars written, or "-1" on error.
-int llwrite(const unsigned char *buf, int bufSize);
+int llwrite(int fd, const unsigned char *buf, int bufSize);
 
 // Receive data in packet.
 // Return number of chars read, or "-1" on error.
@@ -90,6 +91,14 @@ int connect_to_serialPort(const char *serialPort);
 
 void alarmHandler(int signal);
 
-unsigned char *buildSupervisionFrame(unsigned char A, unsigned char C);
+unsigned char buildSupervisionFrame(unsigned char A, unsigned char C);
+
+void state_machine_read_supervision_frames(unsigned char curr_byte, unsigned char A, unsigned char C, LinkLayerState *state);
+
+unsigned char *buildFrameInfo(unsigned char *buffer, int length);
+
+unsigned char buildBCC2(unsigned char *buffer, int length);
+
+void state_machine_read_control_frames(unsigned char curr_byte, unsigned char A, unsigned char C, LinkLayerState *state);
 
 #endif // _LINK_LAYER_H_
