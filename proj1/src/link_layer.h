@@ -17,7 +17,7 @@
 typedef enum
 {
     LlTx,
-    LlRx,
+    LlRx
 } LinkLayerRole;
 
 typedef enum
@@ -36,7 +36,7 @@ typedef enum
 
 typedef struct
 {
-    char serialPort[50];
+    const char *serialPort;
     LinkLayerRole role;
     int baudRate;
     int nRetransmissions;
@@ -80,7 +80,7 @@ int llwrite(int fd, const unsigned char *buf, int bufSize);
 
 // Receive data in packet.
 // Return number of chars read, or "-1" on error.
-int llread(unsigned char *packet);
+int llread(int fd, unsigned char *packet, int packetSize);
 
 // Close previously opened connection.
 // if showStatistics == TRUE, link layer should print statistics in the console on close.
@@ -100,5 +100,7 @@ unsigned char *buildFrameInfo(unsigned char *buffer, int length);
 unsigned char buildBCC2(unsigned char *buffer, int length);
 
 void state_machine_read_control_frames(unsigned char curr_byte, unsigned char A, unsigned char C, LinkLayerState *state);
+
+int checkBCC2(unsigned char *data, int dataSize);
 
 #endif // _LINK_LAYER_H_
