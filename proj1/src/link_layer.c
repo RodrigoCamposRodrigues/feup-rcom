@@ -59,7 +59,7 @@ int main(int argc, char **argv)
         fclose(file);
         return NULL;
     }
-
+    
     // Read the file content
     size_t read_size = fread(file_content, 1, file_size, file);
     if (read_size != file_size) {
@@ -68,6 +68,13 @@ int main(int argc, char **argv)
         fclose(file);
         return NULL;
     }
+
+    //print file content in bytes
+    printf("File content in bytes: ");
+    for(int i = 0; i < file_size; i++){
+        printf("0x%02X ", file_content[i]);
+    }
+    printf("\n");
 
     int fd = llopen(connectionParameters);
 
@@ -192,7 +199,15 @@ int llwrite(int fd, const unsigned char *buf, int bufSize)
 {
     printf("Entered llwrite\n");
     
-    unsigned char *frame_info = buildFrameInfo(buf, bufSize);
+    unsigned char frame_info[4 + (MAX_PAYLOAD_SIZE * 2 + 2) + 2]; 
+
+    int frame_info_size = buildFrameInfo(frame_info, buf, bufSize);
+
+    printf("Frame info: ");
+    for(int i = 0; i < frame_info_size; i++){
+        printf("0x%02X ", frame_info[i]);
+    }
+    printf("\n");
 
     (void)signal(SIGALRM, alarmHandler);
 
@@ -202,7 +217,7 @@ int llwrite(int fd, const unsigned char *buf, int bufSize)
     while(current_transmition < retransmissions && state != STOP_READING){
 
         if(alarm_reached_end == TRUE){ 
-            int bytes_written = write(fd, frame_info, bufSize + 6);
+            int bytes_written = write(fd, frame_info, frame_info_size);
             printf("Sent frame with information. Bytes written: %d\n", bytes_written);
             current_transmition++;
             alarm(timeout);
@@ -250,7 +265,6 @@ int llread(int fd, unsigned char *packet, int packetSize)
     unsigned char frame[frame_size];
     int frame_index = 0;
     int packet_index = 0;
-    unsigned char* file_content = (unsigned char*) malloc(packetSize);
     int file_index = 0;
 
     while (state != STOP_READING)
@@ -258,6 +272,7 @@ int llread(int fd, unsigned char *packet, int packetSize)
         int bytes_read = read(fd, &received_byte, 1);
         //print received byte
         printf("Received byte: 0x%02X\n", received_byte);
+        printf("State: %d\n", state);
         // if (bytes_read <= 0) break;
 
             switch (state) {
@@ -322,7 +337,7 @@ int llread(int fd, unsigned char *packet, int packetSize)
                     }
                     break;                
                 case READING_DATA:
-                    // Flag means the frame is over. Check BCC2 for validity.
+                    // if(received_byte == ESCAPE) state = FOUND_ESC;
                     if (received_byte == FLAG) {
                         state = FLAG_RECEIVED;
                         if (checkBCC2(frame, frame_index - 1)) {
@@ -351,7 +366,7 @@ int llread(int fd, unsigned char *packet, int packetSize)
                             }
 
                             state = STOP_READING;
-                        }
+                        } 
                         else {
                             // Frame is invalid -> Reset state machine.
                             printf("BCC2 is invalid!\n");
@@ -360,8 +375,6 @@ int llread(int fd, unsigned char *packet, int packetSize)
                         }
                     }
                     else {
-                        file_content[file_index++] = received_byte;
-                        printf("index: %d\n", file_index);
                         frame[frame_index++] = received_byte;
                         if (frame_index >= frame_size) {
                             printf("Frame buffer is full. Restarting.\n");
@@ -370,12 +383,27 @@ int llread(int fd, unsigned char *packet, int packetSize)
                         }
                     }
                     break;
+                // case FOUND_ESC:
+                //     //destuffing
+                //     if(received_byte == 0x5E){
+                //         frame[frame_index++] = 0x7E;
+                //         state = READING_DATA;
+                //     }
+                //     else if(received_byte == 0x5D){
+                //         frame[frame_index++] = ESCAPE;
+                //         state = READING_DATA;
+                //     }
+                //     else{
+                //         state = START;
+                //         frame_index = 0;
+                //     }
+                //     break;
                 default:
                     break;
             }  
     }
-    //print file content
-    printf("File content: %s\n", file_content);
+    //print packet content
+    printf("Packet content: %s\n", packet);
 
     return frame_index;
 }
@@ -383,9 +411,60 @@ int llread(int fd, unsigned char *packet, int packetSize)
 ////////////////////////////////////////////////
 // LLCLOSE
 ////////////////////////////////////////////////
-int llclose(int showStatistics)
+int llclose(int showStatistics, LinkLayer connectionParameters)
 {
-    // TODO
+    LinkLayerState state = START;
+
+    struct termios oldtio, newtio;
+
+    int fd = connect_to_serialPort(connectionParameters.serialPort);
+
+    printf("Terminating program...");
+    switch (connectionParameters.role) {
+        case LlTx:
+            printf("Closing connection as sender...\n");
+
+            unsigned char DISC_frame_tx[5] = {FLAG, A_SENDER, DISC, A_SENDER ^ DISC, FLAG};
+            int bytes_written_tx = write(fd, DISC_frame_tx, 5);
+            printf("Sent DISC frame. Bytes written: %d\n", bytes_written_tx);
+
+            state_machine_read_supervision_frames(FLAG, A_SENDER, DISC, &state);
+            printf("Received Disconnect Command. Sending UA Frame.\n");
+
+            unsigned char UA_frame[5] = {FLAG, A_SENDER, UA, A_SENDER ^ UA, FLAG};
+            bytes_written_tx = write(fd, UA_frame, 5);
+            printf("Sent UA frame. Bytes written: %d\n", bytes_written_tx);
+
+            // Restore old port settings
+            if (tcsetattr(fd, TCSANOW, &oldtio) == -1)
+            {
+                perror("tcsetattr");
+                exit(-1);
+            }
+            break;
+
+        case LlRx:
+            printf("Closing connection as receiver...\n");
+
+            state_machine_read_supervision_frames(FLAG, A_RECEIVER, DISC, &state);
+            printf("Received Disconnect Command. Sending Disconnect Command.\n");
+
+            unsigned char DISC_frame_rx[5] = {FLAG, A_RECEIVER, DISC, A_RECEIVER ^ DISC, FLAG};
+            int bytes_written_rx = write(fd, DISC_frame_rx, 5);
+            printf("Sent DISC frame. Bytes written: %d\n", bytes_written_rx);
+
+            state_machine_read_supervision_frames(FLAG, A_RECEIVER, UA, &state);
+            printf("Received UA frame. Restoring port settings and terminating connection.\n");
+
+            // Restore old port settings
+            if (tcsetattr(fd, TCSANOW, &oldtio) == -1)
+            {
+                perror("tcsetattr");
+                exit(-1);
+            }
+
+            break;
+    }
 
     return 1;
 }
@@ -445,7 +524,7 @@ void alarmHandler(int signal)
     alarmCount++;
 }
 
-unsigned char buildSupervisionFrame(unsigned char A, unsigned char C){
+unsigned char *buildSupervisionFrame(unsigned char A, unsigned char C){
     
     unsigned char supervision_frame[5] = {FLAG, A, C, A ^ C, FLAG};
 
@@ -501,26 +580,54 @@ void state_machine_read_supervision_frames(unsigned char curr_byte, unsigned cha
     }
 }
 
-unsigned char *buildFrameInfo(unsigned char *buffer, int length){
-    unsigned char *frame_info = malloc((length + 6) * sizeof(unsigned char));
+int buildFrameInfo(unsigned char *frame_info, unsigned char *buffer, int bufSize){
     frame_info[0] = FLAG;
     frame_info[1] = A_SENDER;
     frame_info[2] = info_frame_number;
     frame_info[3] = frame_info[1] ^ frame_info[2];
-    memcpy(frame_info+4, buffer, length);
+    memcpy(frame_info+4, buffer, bufSize);
 
-    unsigned char BCC2 = buildBCC2(buffer, length);
+    unsigned char BCC2 = buildBCC2(buffer, bufSize);
 
-    frame_info[length + 4] = BCC2;
-    frame_info[length + 5] = FLAG;
+    int j = 4;
+    //stuff BCC2
+    for(unsigned int i = 0; i < bufSize; i++){
+        if(buffer[i] == FLAG){
+            frame_info[j++] = ESCAPE;
+            frame_info[j++] = FLAG ^ 0x20;
+        }
+        else if(buffer[i] == ESCAPE){
+            frame_info[j++] = ESCAPE;
+            frame_info[j++] = ESCAPE ^ 0x20;
+        }
+        else{
+            frame_info[j++] = buffer[i];
+        }
+    }
 
-    return frame_info;
+    if(BCC2 == FLAG){
+        frame_info[j++] = ESCAPE;
+        frame_info[j++] = FLAG ^ 0x20;
+    }
+    else if(BCC2 == ESCAPE){
+        frame_info[j++] = ESCAPE;
+        frame_info[j++] = ESCAPE ^ 0x20;
+    }
+    else{
+        frame_info[j++] = BCC2;
+    }
+
+    printf("BCC2: 0x%02X\n", frame_info[j-1]);
+
+    frame_info[j] = FLAG;
+
+    return j + 1;
 }
 
-unsigned char buildBCC2(unsigned char *buffer, int length){
+unsigned char buildBCC2(unsigned char *buffer, int bufSize){
     unsigned char BCC2 = buffer[0];
 
-    for (int i = 1; i < length + 4; i++)
+    for (int i = 1; i < bufSize + 4; i++)
     {
         BCC2 ^= buffer[i];
     }
@@ -586,7 +693,7 @@ void state_machine_read_control_frames(unsigned char curr_byte, unsigned char A,
 }
 
 int checkBCC2(unsigned char *data, int dataSize) {
-    // Check BCC2 by XORing all bytes in data
+    //Check BCC2 by XORing all bytes in data
     // unsigned char BCC2 = data[0];
     // for (int i = 1; i < dataSize - 1; i++) {
     //     BCC2 ^= data[i];
@@ -594,3 +701,5 @@ int checkBCC2(unsigned char *data, int dataSize) {
     // return (BCC2 == data[dataSize - 1]);
     return 1;
 }
+
+

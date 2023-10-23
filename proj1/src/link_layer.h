@@ -69,6 +69,9 @@ typedef struct
 #define REJ1 0x81
 #define UA 0x07
 #define SET 0x03
+#define DISC 0x0B
+#define ESCAPE 0x7D
+
 
 // Open a connection using the "port" parameters defined in struct linkLayer.
 // Return "1" on success or "-1" on error.
@@ -85,17 +88,17 @@ int llread(int fd, unsigned char *packet, int packetSize);
 // Close previously opened connection.
 // if showStatistics == TRUE, link layer should print statistics in the console on close.
 // Return "1" on success or "-1" on error.
-int llclose(int showStatistics);
+int llclose(int showStatistics, LinkLayer connectionParameters);
 
 int connect_to_serialPort(const char *serialPort);
 
 void alarmHandler(int signal);
 
-unsigned char buildSupervisionFrame(unsigned char A, unsigned char C);
+unsigned char *buildSupervisionFrame(unsigned char A, unsigned char C);
 
 void state_machine_read_supervision_frames(unsigned char curr_byte, unsigned char A, unsigned char C, LinkLayerState *state);
 
-unsigned char *buildFrameInfo(unsigned char *buffer, int length);
+int buildFrameInfo(unsigned char *frame_info, unsigned char *buffer, int bufSize);
 
 unsigned char buildBCC2(unsigned char *buffer, int length);
 
