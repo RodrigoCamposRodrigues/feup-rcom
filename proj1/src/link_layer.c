@@ -260,6 +260,7 @@ int llread(int fd, unsigned char *packet, int packetSize)
 {
     unsigned char received_byte;
     int frame_type = 0;
+    unsigned char new_content[packetSize + 1];
     LinkLayerState state = START;
     int frame_size = packetSize + 6;
     unsigned char frame[frame_size];
@@ -340,17 +341,19 @@ int llread(int fd, unsigned char *packet, int packetSize)
                     if(received_byte == ESCAPE) state = FOUND_ESC;
                     else if (received_byte == FLAG) {
                         // state = FLAG_RECEIVED;
-                        if (checkBCC2(frame, frame_index - 1)) {
-                            // Frame is valid -> Fill packet with data.
-                            printf("BCC2 is valid!\n");
-                            for (int i = 4; i < frame_index - 2; i++) {
-                                packet[packet_index++] = frame[i];
+                            for (int i = 4; i < frame_index - 1; i++) {
+                                printf("0x%02X ", frame[i]);
+                                new_content[packet_index++] = frame[i];
                             }
-                            if (packet_index >= packetSize) {
+                            new_content[packet_index] = '\0';
+                            printf("\n");
+                            if (packet_index > packetSize) {
                                 printf("Packet buffer is full. Aborting read.\n");
                                 return -1;
                             }
-                            //send answer
+                        if (checkBCC2(new_content, packetSize, frame[frame_index - 1])) {
+                            // Frame is valid -> Send response.
+                            printf("BCC2 is valid!\n");
                             switch (info_frame_number)
                             {
                                 case I0:
@@ -368,10 +371,11 @@ int llread(int fd, unsigned char *packet, int packetSize)
                             state = STOP_READING;
                         } 
                         else {
-                            // Frame is invalid -> Reset state machine.
+                            // Frame is invalid -> Abort read.
                             printf("BCC2 is invalid!\n");
                             state = START;
                             frame_index = 0;
+                            return -1;
                         }
                     }
                     else {
@@ -402,8 +406,26 @@ int llread(int fd, unsigned char *packet, int packetSize)
                     break;
             }  
     }
+
+    //print new packet content in bytes
+    printf("Packet (new_content) content in bytes: ");
+    for(int i = 0; i < packet_index; i++){
+        printf("0x%02X ", new_content[i]);
+    }
+    printf("\n");
+
+    printf("Packet (new_content) last byte: 0x%02X\n", new_content[packet_index]);
+
     //print packet content
-    printf("Packet content: %s\n", packet);
+    printf("Packet (new_content) content: %s\n", new_content);
+    
+    //print original packet content in bytes
+    printf("Packet (original) content in bytes: ");
+    for(int i = 0; i <= packet_index; i++){
+        printf("0x%02X ", packet[i]);
+    }
+    printf("\n");
+    printf("Packet (original) content: %s\n", packet);
 
     return frame_index;
 }
@@ -690,14 +712,17 @@ void state_machine_read_control_frames(unsigned char curr_byte, unsigned char A,
     }
 }
 
-int checkBCC2(unsigned char *data, int dataSize) {
-    //Check BCC2 by XORing all bytes in data
-    // unsigned char BCC2 = data[0];
-    // for (int i = 1; i < dataSize - 1; i++) {
-    //     BCC2 ^= data[i];
-    // }
-    // return (BCC2 == data[dataSize - 1]);
-    return 1;
+int checkBCC2(unsigned char *packet, int packetSize, unsigned char bcc2) {
+    unsigned char new_bcc2 = packet[0];  // Initialize with the first data byte.
+    int i;
+
+    for (i = 1; i < packetSize; i++) {
+        new_bcc2 ^= packet[i];
+    }
+
+    printf("Calculated BCC2 and last byte of frame: 0x%02X, 0x%02X\n", bcc2, new_bcc2);
+
+    return (bcc2 == new_bcc2);  // Compare the calculated BCC2 with the received BCC2.
 }
 
 
