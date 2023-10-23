@@ -337,9 +337,9 @@ int llread(int fd, unsigned char *packet, int packetSize)
                     }
                     break;                
                 case READING_DATA:
-                    // if(received_byte == ESCAPE) state = FOUND_ESC;
-                    if (received_byte == FLAG) {
-                        state = FLAG_RECEIVED;
+                    if(received_byte == ESCAPE) state = FOUND_ESC;
+                    else if (received_byte == FLAG) {
+                        // state = FLAG_RECEIVED;
                         if (checkBCC2(frame, frame_index - 1)) {
                             // Frame is valid -> Fill packet with data.
                             printf("BCC2 is valid!\n");
@@ -383,21 +383,21 @@ int llread(int fd, unsigned char *packet, int packetSize)
                         }
                     }
                     break;
-                // case FOUND_ESC:
-                //     //destuffing
-                //     if(received_byte == 0x5E){
-                //         frame[frame_index++] = 0x7E;
-                //         state = READING_DATA;
-                //     }
-                //     else if(received_byte == 0x5D){
-                //         frame[frame_index++] = ESCAPE;
-                //         state = READING_DATA;
-                //     }
-                //     else{
-                //         state = START;
-                //         frame_index = 0;
-                //     }
-                //     break;
+                case FOUND_ESC:
+                    //destuffing
+                    if(received_byte == 0x5E){
+                        frame[frame_index++] = 0x7E;
+                        state = READING_DATA;
+                    }
+                    else if(received_byte == 0x5D){
+                        frame[frame_index++] = ESCAPE;
+                        state = READING_DATA;
+                    }
+                    else{
+                        state = START;
+                        frame_index = 0;
+                    }
+                    break;
                 default:
                     break;
             }  
@@ -616,8 +616,6 @@ int buildFrameInfo(unsigned char *frame_info, unsigned char *buffer, int bufSize
     else{
         frame_info[j++] = BCC2;
     }
-
-    printf("BCC2: 0x%02X\n", frame_info[j-1]);
 
     frame_info[j] = FLAG;
 
