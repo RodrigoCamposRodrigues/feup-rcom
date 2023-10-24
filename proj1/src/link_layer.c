@@ -69,6 +69,9 @@ int main(int argc, char **argv)
         return NULL;
     }
 
+    //close file
+    fclose(file);
+
     //print file content in bytes
     printf("File content in bytes: ");
     for(int i = 0; i < file_size; i++){
@@ -99,6 +102,7 @@ int main(int argc, char **argv)
             break;
     }
 
+    llclose(0, fd, connectionParameters.role);
 
     return 0;
     
@@ -414,18 +418,18 @@ int llread(int fd, unsigned char *packet, int packetSize)
     }
     printf("\n");
 
-    printf("Packet (new_content) last byte: 0x%02X\n", new_content[packet_index]);
+    //printf("Packet (new_content) last byte: 0x%02X\n", new_content[packet_index]);
 
     //print packet content
     printf("Packet (new_content) content: %s\n", new_content);
     
     //print original packet content in bytes
-    printf("Packet (original) content in bytes: ");
-    for(int i = 0; i <= packet_index; i++){
-        printf("0x%02X ", packet[i]);
-    }
-    printf("\n");
-    printf("Packet (original) content: %s\n", packet);
+    // printf("Packet (original) content in bytes: ");
+    // for(int i = 0; i <= packet_index; i++){
+    //     printf("0x%02X ", packet[i]);
+    // }
+    // printf("\n");
+    // printf("Packet (original) content: %s\n", packet);
 
     return frame_index;
 }
@@ -433,60 +437,95 @@ int llread(int fd, unsigned char *packet, int packetSize)
 ////////////////////////////////////////////////
 // LLCLOSE
 ////////////////////////////////////////////////
-int llclose(int showStatistics, LinkLayer connectionParameters)
+int llclose(int showStatistics, int fd, LinkLayerRole role)
 {
     LinkLayerState state = START;
 
-    struct termios oldtio, newtio;
-
-    int fd = connect_to_serialPort(connectionParameters.serialPort);
-
-    printf("Terminating program...");
-    switch (connectionParameters.role) {
+    switch (role) {
         case LlTx:
             printf("Closing connection as sender...\n");
 
             unsigned char DISC_frame_tx[5] = {FLAG, A_SENDER, DISC, A_SENDER ^ DISC, FLAG};
-            int bytes_written_tx = write(fd, DISC_frame_tx, 5);
-            printf("Sent DISC frame. Bytes written: %d\n", bytes_written_tx);
 
-            state_machine_read_supervision_frames(FLAG, A_SENDER, DISC, &state);
-            printf("Received Disconnect Command. Sending UA Frame.\n");
+            while(retransmissions != 0 && state != STOP_READING){
+               if(alarm_reached_end == TRUE){ 
+                    int bytes_written = write(fd, DISC_frame_tx, 5);
+                    printf("Sent DISC frame from transmitter. Bytes written: %d\n", bytes_written);
+                    retransmissions--;
+                    alarm(timeout);
+                    alarm_reached_end = FALSE;
+                }
 
-            unsigned char UA_frame[5] = {FLAG, A_SENDER, UA, A_SENDER ^ UA, FLAG};
-            bytes_written_tx = write(fd, UA_frame, 5);
-            printf("Sent UA frame. Bytes written: %d\n", bytes_written_tx);
+                unsigned char received_byte; 
 
-            // Restore old port settings
-            if (tcsetattr(fd, TCSANOW, &oldtio) == -1)
-            {
-                perror("tcsetattr");
-                exit(-1);
+                while(alarm_reached_end != TRUE && state != STOP_READING){
+                    int bytes_read = read(fd, &received_byte, 1);
+
+                    if(bytes_read > 0){
+                        state_machine_read_supervision_frames(received_byte, A_RECEIVER, DISC, &state);
+                    }
+                    else break;
+                }
             }
+            
+            if(state == STOP_READING){
+                printf("Successfully read DISC frame from receiver!\n");
+                unsigned char UA_frame[5] = {FLAG, A_SENDER, UA, A_SENDER ^ UA, FLAG};
+                int bytes_written_UA = write(fd, UA_frame, 5);
+                printf("Sent UA frame. Bytes written: %d\n", bytes_written_UA);
+            }
+            else{
+                printf("Couldn't read DISC frame.\n");
+                return -1;
+            }
+            
             break;
 
         case LlRx:
-            printf("Closing connection as receiver...\n");
+            unsigned char received_byte;
 
-            state_machine_read_supervision_frames(FLAG, A_RECEIVER, DISC, &state);
-            printf("Received Disconnect Command. Sending Disconnect Command.\n");
+            while(state != STOP_READING){
 
-            unsigned char DISC_frame_rx[5] = {FLAG, A_RECEIVER, DISC, A_RECEIVER ^ DISC, FLAG};
-            int bytes_written_rx = write(fd, DISC_frame_rx, 5);
-            printf("Sent DISC frame. Bytes written: %d\n", bytes_written_rx);
+                int bytes_read = read(fd, &received_byte, 1);
 
-            state_machine_read_supervision_frames(FLAG, A_RECEIVER, UA, &state);
-            printf("Received UA frame. Restoring port settings and terminating connection.\n");
+                if(bytes_read > 0){
+                    state_machine_read_supervision_frames(received_byte, A_SENDER, DISC, &state);
+                }
+            }
 
-            // Restore old port settings
-            if (tcsetattr(fd, TCSANOW, &oldtio) == -1)
-            {
-                perror("tcsetattr");
-                exit(-1);
+            if(state == STOP_READING){
+                printf("Successfully read DISC frame from transmitter!\n");
+                unsigned char DISC_frame_rx[5] = {FLAG, A_RECEIVER, DISC, A_RECEIVER ^ DISC, FLAG};
+                int bytes_written_DISC_rx = write(fd, DISC_frame_rx, 5);
+                printf("Sent DISC frame from receiver. Bytes written: %d\n", bytes_written_DISC_rx);
+
+                state = START;
+
+                while(state != STOP_READING){
+                    int bytes_read = read(fd, &received_byte, 1);
+
+                    if(bytes_read > 0){
+                        state_machine_read_supervision_frames(received_byte, A_SENDER, UA, &state);
+                    }
+                }
+
+                if(state == STOP_READING){
+                    printf("Successfully read UA frame!\n");
+                }
+                else{
+                    printf("Couldn't read UA frame.\n");
+                    return -1;
+                }
+            }
+            else{
+                printf("Couldn't read DISC frame.\n");
+                return -1;
             }
 
             break;
     }
+
+    printf("Terminating program...\n");
 
     return 1;
 }
@@ -592,7 +631,6 @@ void state_machine_read_supervision_frames(unsigned char curr_byte, unsigned cha
         if (curr_byte == FLAG)
         {
             *state = STOP_READING;
-            printf("Read successfully!\n");
         }
         else
             *state = START;
