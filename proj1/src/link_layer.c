@@ -1,6 +1,6 @@
 // Link layer protocol implementation
 
-#include "link_layer.h"
+#include "../include/link_layer.h"
 
 // MISC
 #define _POSIX_SOURCE 1 // POSIX compliant source
@@ -10,103 +10,112 @@ int alarm_reached_end = TRUE;
 int timeout = 0;
 int retransmissions = 0;
 int STOP = FALSE;
+int fd = 0;
 unsigned char info_frame_number = I0;
+LinkLayer connectionParameters_global;
 
-int main(int argc, char **argv)
-{
-    if (argc < 3)
-    {
-        printf("Incorrect program usage\n"
-               "Usage: %s <SerialPort> <User>\n"
-               "Example: %s /dev/ttyS1 0\n",
-               argv[0],
-               argv[0]);
-        exit(1);
-    }
+// int main(int argc, char **argv)
+// {
+//     if (argc < 3)
+//     {
+//         printf("Incorrect program usage\n"
+//                "Usage: %s <SerialPort> <User>\n"
+//                "Example: %s /dev/ttyS1 0\n",
+//                argv[0],
+//                argv[0]);
+//         exit(1);
+//     }
 
-    //create linklayer struct
-    LinkLayer connectionParameters;
-    connectionParameters.serialPort = argv[1];
-    if(argv[2][0] == '0') connectionParameters.role = LlTx;
-    else if(argv[2][0] == '1') connectionParameters.role = LlRx;
-    else exit(-1);
-    connectionParameters.baudRate = BAUDRATE;
-    connectionParameters.nRetransmissions = 3;
-    connectionParameters.timeout = 3;    
+//     //create linklayer struct
+//     connectionParameters.serialPort = argv[1];
+//     if(argv[2][0] == '0') connectionParameters.role = LlTx;
+//     else if(argv[2][0] == '1') connectionParameters.role = LlRx;
+//     else exit(-1);
+//     connectionParameters.baudRate = BAUDRATE;
+//     connectionParameters.nRetransmissions = 3;
+//     connectionParameters.timeout = 3;    
 
-    //open file
-    FILE* file = fopen("hello.txt", "rb"); // Open the file in binary mode
+//     //open file
+//     FILE* file = fopen("hello.txt", "rb"); // Open the file in binary mode
 
-    if (file == NULL) {
-        perror("Failed to open the file");
-        return NULL;
-    }
+//     if (file == NULL) {
+//         perror("Failed to open the file");
+//         return NULL;
+//     }
 
-    struct stat st;
+//     struct stat st;
 
-    if (stat("hello.txt", &st) == -1) {
-        perror("stat");
-        return NULL;
-    }
+//     if (stat("hello.txt", &st) == -1) {
+//         perror("stat");
+//         return NULL;
+//     }
 
-    //get the bytes from the file
-    int file_size = st.st_size;
+//     //get the bytes from the file
+//     int file_size = st.st_size;
 
-    // Allocate memory for the file content
-    char* file_content = (char*)malloc(file_size);
-    if (file_content == NULL) {
-        perror("Failed to allocate memory for file content");
-        fclose(file);
-        return NULL;
-    }
+//     // Allocate memory for the file content
+//     char* file_content = (char*)malloc(file_size);
+//     if (file_content == NULL) {
+//         perror("Failed to allocate memory for file content");
+//         fclose(file);
+//         return NULL;
+//     }
     
-    // Read the file content
-    size_t read_size = fread(file_content, 1, file_size, file);
-    if (read_size != file_size) {
-        perror("Failed to read the file");
-        free(file_content);
-        fclose(file);
-        return NULL;
-    }
+//     // Read the file content
+//     size_t read_size = fread(file_content, 1, file_size, file);
+//     if (read_size != file_size) {
+//         perror("Failed to read the file");
+//         free(file_content);
+//         fclose(file);
+//         return NULL;
+//     }
 
-    //close file
-    fclose(file);
+//     //close file
+//     fclose(file);
 
-    //print file content in bytes
-    printf("File content in bytes: ");
-    for(int i = 0; i < file_size; i++){
-        printf("0x%02X ", file_content[i]);
-    }
-    printf("\n");
+//     fd = llopen(connectionParameters);
 
-    int fd = llopen(connectionParameters);
+//     if(fd > 0){
+//         printf("Connection established!\n");
+//     }
+//     else{
+//         printf("Connection failed!\n");
+//         exit(-1);
+//     }
 
-    if(fd > 0){
-        printf("Connection established!\n");
-    }
-    else{
-        printf("Connection failed!\n");
-        exit(-1);
-    }
+//     switch(connectionParameters.role){
+//         case LlTx: {
+//             llwrite(file_content, file_size);
 
-    switch(connectionParameters.role){
-        case LlTx: {
-            llwrite(fd, file_content, file_size);
-            break;
-        }
-        case LlRx: {
-            llread(fd, file_content, file_size);
-            break;
-        }
-        default:
-            break;
-    }
+//             //print file content in bytes
+//             printf("File content in bytes: ");
+//             for(int i = 0; i < file_size; i++){
+//                 printf("0x%02X ", file_content[i]);
+//             }
+//             printf("\n");
+//             break;
+//         }
+//         case LlRx: {
+//             unsigned char new_file_content[file_size];
+//             llread(&new_file_content);
 
-    llclose(0, fd, connectionParameters.role);
+//             //print new file content in bytes
+//             printf("New File content in bytes: ");
+//             for(int i = 0; i < file_size; i++){
+//                 printf("0x%02X ", new_file_content[i]);
+//             }
+//             printf("\n");
+//             break;
+//         }
+//         default:
+//             break;
+//     }
 
-    return 0;
+//     llclose(0);
+
+//     return 0;
     
-}
+// }
 
 ////////////////////////////////////////////////
 // LLOPEN
@@ -116,8 +125,9 @@ int llopen(LinkLayer connectionParameters)
     printf("Entered llopen\n");
     LinkLayerState state = START;
     
-    int fd = connect_to_serialPort(connectionParameters.serialPort);
+    fd = connect_to_serialPort(connectionParameters.serialPort);
 
+    connectionParameters_global = connectionParameters;
     timeout = connectionParameters.timeout;
     retransmissions = connectionParameters.nRetransmissions;
 
@@ -198,8 +208,8 @@ int llopen(LinkLayer connectionParameters)
 
 ////////////////////////////////////////////////
 // LLWRITE
-////////////////////////////////////////////////
-int llwrite(int fd, const unsigned char *buf, int bufSize)
+///////r/////////////////////////////////////////
+int llwrite(const unsigned char *buf, int bufSize)
 {
     printf("Entered llwrite\n");
     
@@ -227,25 +237,26 @@ int llwrite(int fd, const unsigned char *buf, int bufSize)
             alarm(timeout);
             alarm_reached_end = FALSE;
         }
-
+        
         unsigned char received_byte;
         state = START;
 
         while(state != STOP_READING){
             int bytes_read = read(fd, &received_byte, 1);
-
+            
             if(bytes_read > 0){
                 if(info_frame_number == I0){
                     state_machine_read_control_frames(received_byte, A_RECEIVER, RR1, &state);
                 }
                 else if(info_frame_number == I1){ 
-                    state = STOP_READING;   //this line is for testing with hello.txt                 
-                    //state_machine_read_control_frames(received_byte, A_RECEIVER, RR0, &state);
+                    state_machine_read_control_frames(received_byte, A_RECEIVER, RR0, &state);
                 }
             }
             else break;
         }
     }
+
+    alarm_reached_end = TRUE;
 
     if(state != STOP_READING){
         printf("Couldn't read control frame!\n");
@@ -260,14 +271,14 @@ int llwrite(int fd, const unsigned char *buf, int bufSize)
 ////////////////////////////////////////////////
 // LLREAD
 ////////////////////////////////////////////////
-int llread(int fd, unsigned char *packet, int packetSize)
+int llread(unsigned char *packet)
 {
+    printf("Entered llread\n");
     unsigned char received_byte;
     int frame_type = 0;
-    unsigned char new_content[packetSize + 1];
     LinkLayerState state = START;
-    int frame_size = packetSize + 6;
-    unsigned char frame[frame_size];
+    int frame_size = 6;
+    unsigned char frame[MAX_PAYLOAD_SIZE * 2 + 2 + 4];
     int frame_index = 0;
     int packet_index = 0;
     int file_index = 0;
@@ -276,152 +287,153 @@ int llread(int fd, unsigned char *packet, int packetSize)
     {
         int bytes_read = read(fd, &received_byte, 1);
         //print received byte
-        printf("Received byte: 0x%02X\n", received_byte);
+        printf("Received byte: 0x%02X\n", received_byte); 
         printf("State: %d\n", state);
         // if (bytes_read <= 0) break;
 
-            switch (state) {
-                case START:
-                    if (received_byte == FLAG) {
-                        state = FLAG_RECEIVED;
-                        printf("Flag received!\n");
-                        frame[frame_index++] = received_byte;
+        switch (state) {
+            case START:
+                if (received_byte == FLAG) {
+                    state = FLAG_RECEIVED;
+                    printf("Flag received!\n");
+                    frame[frame_index++] = received_byte;
+                }
+                else
+                    state = START;
+                break;
+            case FLAG_RECEIVED:
+                if (received_byte == FLAG) {
+                    state = FLAG_RECEIVED;
+                }
+                else if (received_byte == A_SENDER) {
+                    state = A_RECEIVED;
+                    printf("A received!\n");
+                    frame[frame_index++] = received_byte;
+                }
+                else {
+                    state = START;
+                    frame_index = 0;
+                }
+                break;
+            case A_RECEIVED:
+                if (received_byte == FLAG) {
+                    state = FLAG_RECEIVED;
+                    frame_index = 1;
+                }
+                else if (received_byte == I0) {
+                    state = C_RECEIVED;
+                    printf("I0 received!\n");
+                    frame_type = I0;
+                    frame[frame_index++] = received_byte;
+                }
+                else if (received_byte == I1) {
+                    state = C_RECEIVED;
+                    printf("I1 received!\n");
+                    frame_type = I1;
+                    frame[frame_index++] = received_byte;
+                }
+                else {
+                    state = START;
+                    frame_index = 0;
+                }
+                break;
+            case C_RECEIVED:
+                if (received_byte == FLAG) {
+                    state = FLAG_RECEIVED;
+                    frame_index = 1;
+                }
+                else if (received_byte == (A_SENDER ^ frame[frame_index - 1])) {
+                    state = READING_DATA;
+                    printf("BCC1 checked!\n");
+                    frame[frame_index++] = received_byte;
+                }
+                else {
+                    state = START;
+                    frame_index = 0;
+                }
+                break;                
+            case READING_DATA:
+                if(received_byte == ESCAPE) state = FOUND_ESC;
+                else if (received_byte == FLAG) {
+                    int packetSize = frame_size - 6;
+                    // state = FLAG_RECEIVED;
+                    for (int i = 4; i < frame_index - 1; i++) {
+                        printf("0x%02X ", frame[i]);
+                        packet[packet_index++] = frame[i];
                     }
-                    else
-                        state = START;
-                    break;
-                case FLAG_RECEIVED:
-                    if (received_byte == FLAG) {
-                        state = FLAG_RECEIVED;
+                    packet[packet_index] = '\0';
+                    printf("\n");
+                    if (packet_index > packetSize) {
+                        printf("Packet buffer is full. Aborting read.\n");
+                        return -1;
                     }
-                    else if (received_byte == A_SENDER) {
-                        state = A_RECEIVED;
-                        printf("A received!\n");
-                        frame[frame_index++] = received_byte;
-                    }
-                    else {
-                        state = START;
-                        frame_index = 0;
-                    }
-                    break;
-                case A_RECEIVED:
-                    if (received_byte == FLAG) {
-                        state = FLAG_RECEIVED;
-                        frame_index = 1;
-                    }
-                    else if (received_byte == I0) {
-                        state = C_RECEIVED;
-                        printf("I0 received!\n");
-                        frame_type = I0;
-                        frame[frame_index++] = received_byte;
-                    }
-                    else if (received_byte == I1) {
-                        state = C_RECEIVED;
-                        printf("I1 received!\n");
-                        frame_type = I1;
-                        frame[frame_index++] = received_byte;
-                    }
-                    else {
-                        state = START;
-                        frame_index = 0;
-                    }
-                    break;
-                case C_RECEIVED:
-                    if (received_byte == FLAG) {
-                        state = FLAG_RECEIVED;
-                        frame_index = 1;
-                    }
-                    else if (received_byte == (A_SENDER ^ info_frame_number)) {
-                        state = READING_DATA;
-                        printf("BCC1 checked!\n");
-                        frame[frame_index++] = received_byte;
-                    }
-                    else {
-                        state = START;
-                        frame_index = 0;
-                    }
-                    break;                
-                case READING_DATA:
-                    if(received_byte == ESCAPE) state = FOUND_ESC;
-                    else if (received_byte == FLAG) {
-                        // state = FLAG_RECEIVED;
-                            for (int i = 4; i < frame_index - 1; i++) {
-                                printf("0x%02X ", frame[i]);
-                                new_content[packet_index++] = frame[i];
-                            }
-                            new_content[packet_index] = '\0';
-                            printf("\n");
-                            if (packet_index > packetSize) {
-                                printf("Packet buffer is full. Aborting read.\n");
-                                return -1;
-                            }
-                        if (checkBCC2(new_content, packetSize, frame[frame_index - 1])) {
-                            // Frame is valid -> Send response.
-                            printf("BCC2 is valid!\n");
-                            switch (info_frame_number)
-                            {
-                                case I0:
-                                    //send answer
-                                    unsigned char RR1_frame[5] = {FLAG, A_RECEIVER, RR1, A_RECEIVER ^ RR0, FLAG};
-                                    write(fd, RR1_frame, 5);
-                                    break;
-                                case I1:
-                                    //send answer
-                                    unsigned char RR0_frame[5] = {FLAG, A_RECEIVER, RR0, A_RECEIVER ^ RR1, FLAG};
-                                    write(fd, RR0_frame, 5);
-                                    break;
-                            }
+                    if (checkBCC2(packet, packetSize, frame[frame_index - 1])) {
+                        // Frame is valid -> Send response.
+                        printf("BCC2 is valid!\n");
+                        switch (frame_type)
+                        {
+                            case I0:
+                                //send answer
+                                unsigned char RR1_frame[5] = {FLAG, A_RECEIVER, RR1, A_RECEIVER ^ RR0, FLAG};
+                                write(fd, RR1_frame, 5);
+                                break;
+                            case I1:
+                                //send answer
+                                unsigned char RR0_frame[5] = {FLAG, A_RECEIVER, RR0, A_RECEIVER ^ RR1, FLAG};
+                                write(fd, RR0_frame, 5);
+                                break;
+                        }
 
-                            state = STOP_READING;
-                        } 
-                        else {
-                            // Frame is invalid -> Abort read.
-                            printf("BCC2 is invalid!\n");
-                            state = START;
-                            frame_index = 0;
-                            return -1;
-                        }
-                    }
+                        state = STOP_READING;
+                    } 
                     else {
-                        frame[frame_index++] = received_byte;
-                        if (frame_index >= frame_size) {
-                            printf("Frame buffer is full. Restarting.\n");
-                            state = START;
-                            frame_index = 0;
-                        }
+                        // Frame is invalid -> Abort read.
+                        printf("BCC2 is invalid!\n");
+                        state = START;
+                        frame_index = 0;
+                        return -1;
                     }
-                    break;
-                case FOUND_ESC:
-                    //destuffing
-                    if(received_byte == 0x5E){
-                        frame[frame_index++] = 0x7E;
-                        state = READING_DATA;
-                    }
-                    else if(received_byte == 0x5D){
-                        frame[frame_index++] = ESCAPE;
-                        state = READING_DATA;
-                    }
-                    else{
+                }
+                else {
+                    frame_size++;
+                    frame[frame_index++] = received_byte;
+                    if (frame_index >= frame_size) {
+                        printf("Frame buffer is full. Restarting.\n");
                         state = START;
                         frame_index = 0;
                     }
-                    break;
-                default:
-                    break;
-            }  
+                }
+                break;
+            case FOUND_ESC:
+                //destuffing
+                if(received_byte == 0x5E){
+                    frame[frame_index++] = 0x7E;
+                    state = READING_DATA;
+                }
+                else if(received_byte == 0x5D){
+                    frame[frame_index++] = ESCAPE;
+                    state = READING_DATA;
+                }
+                else{
+                    state = START;
+                    frame_index = 0;
+                }
+                frame_size++;
+                break;
+            default:
+                break;
+        }  
     }
 
     //print new packet content in bytes
     printf("Packet (new_content) content in bytes: ");
     for(int i = 0; i < packet_index; i++){
-        printf("0x%02X ", new_content[i]);
+        printf("0x%02X ", packet[i]);
     }
     printf("\n");
 
     //printf("Packet (new_content) last byte: 0x%02X\n", new_content[packet_index]);
 
-    //print packet content
-    printf("Packet (new_content) content: %s\n", new_content);
     
     //print original packet content in bytes
     // printf("Packet (original) content in bytes: ");
@@ -437,11 +449,11 @@ int llread(int fd, unsigned char *packet, int packetSize)
 ////////////////////////////////////////////////
 // LLCLOSE
 ////////////////////////////////////////////////
-int llclose(int showStatistics, int fd, LinkLayerRole role)
+int llclose(int showStatistics)
 {
     LinkLayerState state = START;
 
-    switch (role) {
+    switch (connectionParameters_global.role) {
         case LlTx:
             printf("Closing connection as sender...\n");
 
@@ -491,6 +503,7 @@ int llclose(int showStatistics, int fd, LinkLayerRole role)
                 if(bytes_read > 0){
                     state_machine_read_supervision_frames(received_byte, A_SENDER, DISC, &state);
                 }
+                else break;
             }
 
             if(state == STOP_READING){
@@ -507,6 +520,7 @@ int llclose(int showStatistics, int fd, LinkLayerRole role)
                     if(bytes_read > 0){
                         state_machine_read_supervision_frames(received_byte, A_SENDER, UA, &state);
                     }
+                    else break;
                 }
 
                 if(state == STOP_READING){
@@ -559,8 +573,8 @@ int connect_to_serialPort(const char *serialPort){
 
     // Set input mode (non-canonical, no echo,...)
     newtio.c_lflag = 0;
-    newtio.c_cc[VTIME] = 0.1; // Inter-character timer unused
-    newtio.c_cc[VMIN] = 0;  // Blocking read until 5 chars received
+    newtio.c_cc[VTIME] = 0; // Inter-character timer unused
+    newtio.c_cc[VMIN] = 1;  // Blocking read until 5 chars received
 
     // Flushes data received but not read
     tcflush(fd, TCIOFLUSH);
@@ -583,6 +597,7 @@ void alarmHandler(int signal)
 
     alarm_reached_end = TRUE;
     alarmCount++;
+    printf("Alarm count: %d\n", alarmCount);
 }
 
 unsigned char *buildSupervisionFrame(unsigned char A, unsigned char C){
@@ -645,6 +660,7 @@ int buildFrameInfo(unsigned char *frame_info, unsigned char *buffer, int bufSize
     frame_info[1] = A_SENDER;
     frame_info[2] = info_frame_number;
     frame_info[3] = frame_info[1] ^ frame_info[2];
+    printf("bcc1: 0x%02X\n", frame_info[3]);
     memcpy(frame_info+4, buffer, bufSize);
 
     unsigned char BCC2 = buildBCC2(buffer, bufSize);
@@ -685,7 +701,7 @@ int buildFrameInfo(unsigned char *frame_info, unsigned char *buffer, int bufSize
 unsigned char buildBCC2(unsigned char *buffer, int bufSize){
     unsigned char BCC2 = buffer[0];
 
-    for (int i = 1; i < bufSize + 4; i++)
+    for (int i = 1; i < bufSize; i++)
     {
         BCC2 ^= buffer[i];
     }
@@ -762,5 +778,3 @@ int checkBCC2(unsigned char *packet, int packetSize, unsigned char bcc2) {
 
     return (bcc2 == new_bcc2);  // Compare the calculated BCC2 with the received BCC2.
 }
-
-

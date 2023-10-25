@@ -71,6 +71,8 @@ typedef struct
 #define SET 0x03
 #define DISC 0x0B
 #define ESCAPE 0x7D
+#define ESCAPE_FLAG 0x5E
+#define ESCAPE_ESCAPE 0x5D
 
 
 // Open a connection using the "port" parameters defined in struct linkLayer.
@@ -79,16 +81,16 @@ int llopen(LinkLayer connectionParameters);
 
 // Send data in buf with size bufSize.
 // Return number of chars written, or "-1" on error.
-int llwrite(int fd, const unsigned char *buf, int bufSize);
+int llwrite(const unsigned char *buf, int bufSize);
 
 // Receive data in packet.
 // Return number of chars read, or "-1" on error.
-int llread(int fd, unsigned char *packet, int packetSize);
+int llread(unsigned char *packet);
 
 // Close previously opened connection.
 // if showStatistics == TRUE, link layer should print statistics in the console on close.
 // Return "1" on success or "-1" on error.
-int llclose(int showStatistics, int fd, LinkLayerRole role);
+int llclose(int showStatistics);
 
 int connect_to_serialPort(const char *serialPort);
 
