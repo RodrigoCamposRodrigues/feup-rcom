@@ -48,17 +48,18 @@ int buildDataPacket(unsigned char *data_to_send, int data_size_to_send, unsigned
     return data_packet_size;
 }
 
-unsigned char *parseControlPacket(unsigned char *received_packet, int received_packet_size, int *received_file_size){
-    //File size
-    unsigned char file_size_bytes_to_store = received_packet[2];
-    memcpy(received_file_size, received_packet + 3, file_size_bytes_to_store);
-
-    //Filename
-    unsigned char file_name_bytes_to_store = received_packet[4 + file_size_bytes_to_store];
-    unsigned char *received_filename = (unsigned char *) malloc(file_name_bytes_to_store);
-    memcpy(received_filename, received_packet + 5 + file_size_bytes_to_store, file_name_bytes_to_store);
-
-    return received_filename;
+int parseControlPacket(unsigned char *received_packet, int received_packet_size, unsigned char *received_filename){
+    int received_file_size = 0;
+    for(int i = 0; i<received_packet_size; i++) {
+        if(received_packet[i] == 0) {
+            i++;
+            for(int j = 0; j < received_packet[i]; j++) {
+                received_file_size |= (received_packet[i+j+1] << (8*j));
+            }
+        }
+    }
+    received_filename = 'cok';
+    return received_file_size;
 }
 
 void parseDataPacket(const unsigned char* received_packet, const unsigned int received_packet_size, unsigned char* content_to_write){
@@ -118,7 +119,11 @@ void applicationLayer(const char *serialPort, const char *role, int baudRate,
             printf("Start control packet sent\n");
 
             //read data from file and store it in a content variable
-            unsigned char content[file_size];
+            unsigned char *content = (unsigned char *)malloc(file_size);
+            if (content == NULL) {
+                printf("Error allocating memory for content\n");
+                exit(-1);
+            }            
             fread(content, 1, file_size, file);
             int content_index = 0;
 
@@ -149,41 +154,39 @@ void applicationLayer(const char *serialPort, const char *role, int baudRate,
             }
             if(sendControlPacket(3, file_size, filename) < 0)
             {
+                free(content);
                 printf("Error sending end control packet\n");
                 exit(-1);
             }
 
             printf("End control packet sent\n");
             
+            free(content);
             llclose(fd); //mudar declaração do llclose
             break;}
         case LlRx:
 {
-            unsigned char received_packet[MAX_PAYLOAD_SIZE];
-            int received_packet_size = -1;
-            while(received_packet_size < 0)
-            {
-                received_packet_size = llread(received_packet);
+            while(1){
+                //call llread
+                unsigned char received_packet[MAX_PAYLOAD_SIZE];
+                int received_packet_size = llread(received_packet);
+                //print packet
+                printf("Received packet with size: %d ", received_packet_size);
+                for(int i = 0; i < received_packet_size; i++)
+                {
+                    printf("0x%02X ", received_packet[i]);
+                }
+                printf("\n");
+
+                if(received_packet_size < 0)
+                {
+                    printf("Error receiving packet\n");
+                    exit(-1);
+                }
+
+                if(packetRecognition(received_packet, received_packet_size) == FALSE)
+                    break;
             }
-
-            int received_file_size = 0;
-
-            unsigned char *received_filename = parseControlPacket(received_packet, received_packet_size, &received_file_size);
-
-            FILE* new_file = fopen(received_filename, "wb");
-
-            while((received_packet_size = llread(received_packet)) < 0){
-                printf("2\n");
-                if(received_packet_size  == 0) break;
-
-                if(received_packet[0] == 3) break; //end control packet
-                parseDataPacket(received_packet, received_packet_size, received_filename);
-                printf("3\n");
-                fwrite(received_filename, 1, received_packet_size - 4, new_file);
-                printf("Received packet with size: %d\n", received_packet_size);
-            } 
-
-            fclose(new_file);
 
             llclose(fd);
             break;}
@@ -195,4 +198,56 @@ void applicationLayer(const char *serialPort, const char *role, int baudRate,
 }
 
 
+int packetRecognition(unsigned char *received_packet, int received_packet_size)
+{
+    unsigned char *file_name[40];
+    int received_file_size;
+    static int local_fd;
+    
+    printf("received_packet[0]: %d\n", received_packet[0]);
+    switch(received_packet[0])
+    {
+        case 2:
+        {
+            printf("Start in packetRecognition\n");
+            //start packet received
+            received_file_size = parseControlPacket(received_packet, received_packet_size, file_name);
+            printf("final of thing\n");
+            local_fd = open(file_name, O_WRONLY | O_CREAT, 0777);
+            if(local_fd < 0){
+                printf("Error opening file\n");
+                exit(-1);
+            }
+
+            return TRUE;
+        }
+
+        case 1:
+        {
+            printf("data in packetRecognition\n");
+
+            int bytes_to_write = received_packet[2] * 256 + received_packet[3];
+            
+            if(write(local_fd, received_packet + 4, bytes_to_write) < 0 ){
+                printf("Error writing to file\n");
+                exit(-1);
+            }
+
+            return TRUE;
+        }
+
+        case 3:
+        {
+            printf("end in packetRecognition\n");
+
+            //received end packet
+            close(local_fd);
+            return FALSE;
+        }
+        default:
+            printf("Invalid control packet\n");
+            exit(-1);
+            break;
+    }
+}
 

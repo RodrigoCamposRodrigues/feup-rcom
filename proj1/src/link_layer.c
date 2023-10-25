@@ -442,8 +442,8 @@ int llread(unsigned char *packet)
     // }
     // printf("\n");
     // printf("Packet (original) content: %s\n", packet);
-
-    return frame_index;
+    printf("frame_index: %d\n", packet_index);
+    return packet_index;
 }
 
 ////////////////////////////////////////////////
