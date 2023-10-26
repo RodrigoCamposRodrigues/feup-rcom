@@ -451,6 +451,7 @@ int llread(unsigned char *packet)
 ////////////////////////////////////////////////
 int llclose(int showStatistics)
 {
+    printf("Entered llclose\n");
     LinkLayerState state = START;
 
     switch (connectionParameters_global.role) {
