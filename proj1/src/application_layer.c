@@ -2,7 +2,7 @@
 
 #include "application_layer.h"
 
-int sendControlPacket(const unsigned int C, long int file_size, const char *filename)
+int sendControlPacket(const unsigned int C, int file_size, const char *filename)
 {
     const int l1 = sizeof(file_size);
     const int l2 = strlen(filename);
@@ -16,7 +16,6 @@ int sendControlPacket(const unsigned int C, long int file_size, const char *file
 
     for(int i = 0; i < l1; i++)
     {
-        // control_packet_start[3 + i] = (file_size >> (8 * (l1 - 1 - i))) & 0xFF;
         control_packet_start[2 + l1 - i] = file_size & 0xFF;
         file_size >>= 8;
     }
@@ -62,9 +61,14 @@ int buildDataPacket(unsigned char *data_to_send, int data_size_to_send, unsigned
 int parseControlPacket(unsigned char *received_packet, int received_packet_size, unsigned char *received_filename){
     
     int received_file_size_bytes = received_packet[2];
+    printf("Received file size bytes: %d\n", received_file_size_bytes);
     int received_file_size_aux[received_file_size_bytes];
     int received_file_size = 0;
-    memcpy(received_file_size_aux, received_packet + 3, received_file_size_bytes);
+
+    for (int i = 0; i < received_file_size_bytes; i++) {
+        received_file_size_aux[i] = received_packet[3 + i];
+    }
+
     for(int i = 0; i < received_file_size_bytes; i++)
     {
         received_file_size |= (received_file_size_aux[received_file_size_bytes - i - 1] << (8*i));
@@ -72,7 +76,15 @@ int parseControlPacket(unsigned char *received_packet, int received_packet_size,
     printf("Received file size: %d\n", received_file_size);
 
     int received_filename_bytes = received_packet[received_file_size_bytes + 4];
-    memcpy(received_filename, received_packet + received_file_size_bytes + 5, received_filename_bytes);
+    printf("Received filename bytes: %d\n", received_filename_bytes);
+
+    for(int i = 0; i < received_filename_bytes; i++)
+    {
+        received_filename[i] = received_packet[received_file_size_bytes + 5 + i];
+    }
+
+    received_filename[received_filename_bytes] = '\0';
+
     printf("Received filename: %s\n", received_filename);
 
     return received_file_size;
@@ -82,7 +94,7 @@ int packetRecognition(unsigned char *received_packet, int received_packet_size)
 {
     unsigned char *file_name[40];
     int received_file_size;
-    static int local_fd;
+    FILE* new_file;
     
     printf("received_packet[0]: %d\n", received_packet[0]);
     switch(received_packet[0])
@@ -92,9 +104,10 @@ int packetRecognition(unsigned char *received_packet, int received_packet_size)
             printf("Start in packetRecognition\n");
             //start packet received
             received_file_size = parseControlPacket(received_packet, received_packet_size, file_name);
-            printf("final of thing\n");
-            local_fd = open(file_name, O_WRONLY | O_CREAT, 0777);
-            if(local_fd < 0){
+
+            new_file = fopen(file_name, "wb+");
+            if(new_file == NULL)
+            {
                 printf("Error opening file\n");
                 exit(-1);
             }
@@ -106,12 +119,7 @@ int packetRecognition(unsigned char *received_packet, int received_packet_size)
         {
             printf("data in packetRecognition\n");
 
-            int bytes_to_write = received_packet[2] * 256 + received_packet[3];
-            
-            if(write(local_fd, received_packet + 4, bytes_to_write) < 0 ){
-                printf("Error writing to file\n");
-                exit(-1);
-            }
+            fwrite(received_packet + 3, 1, received_packet_size - 3, new_file);
 
             return TRUE;
         }
@@ -120,8 +128,9 @@ int packetRecognition(unsigned char *received_packet, int received_packet_size)
         {
             printf("end in packetRecognition\n");
 
+            fclose(new_file);
             //received end packet
-            close(local_fd);
+            // close(local_fd);
             return FALSE;
         }
         default:
@@ -172,7 +181,7 @@ void applicationLayer(const char *serialPort, const char *role, int baudRate,
             //determine file size
             int prev = ftell(file);
             fseek(file, 0, SEEK_END);
-            long int file_size = ftell(file) - prev;
+            int file_size = ftell(file) - prev;
             printf("File size: %ld\n", file_size);
             fseek(file, 0, SEEK_SET);
 
