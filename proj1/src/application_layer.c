@@ -119,7 +119,11 @@ int packetRecognition(unsigned char *received_packet, int received_packet_size)
         {
             printf("data in packetRecognition\n");
 
-            fwrite(received_packet + 3, 1, received_packet_size - 3, new_file);
+            //parse data packet
+            int data_size = received_packet[1] * 256 + received_packet[2];
+
+
+            fwrite(received_packet + 3, 1, data_size, new_file);
 
             return TRUE;
         }
@@ -202,7 +206,8 @@ void applicationLayer(const char *serialPort, const char *role, int baudRate,
 
             while (bytes_left_to_send > 0) {
                 // Read a chunk of data from the file
-                int data_size_to_send = (bytes_left_to_send > MAX_PAYLOAD_SIZE) ? content_size : bytes_left_to_send;
+                printf("Bytes left to send: %d\n", bytes_left_to_send);
+                int data_size_to_send = ((bytes_left_to_send + 3) > MAX_PAYLOAD_SIZE) ? content_size : bytes_left_to_send;
                 fread(content, 1, data_size_to_send, file);
 
                 // Copy data to data_to_send array

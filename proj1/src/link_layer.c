@@ -287,8 +287,8 @@ int llread(unsigned char *packet)
     {
         int bytes_read = read(fd, &received_byte, 1);
         //print received byte
-        printf("Received byte: 0x%02X\n", received_byte); 
-        printf("State: %d\n", state);
+        // printf("Received byte: 0x%02X\n", received_byte); 
+        // printf("State: %d\n", state);
         // if (bytes_read <= 0) break;
 
         switch (state) {
@@ -610,7 +610,7 @@ unsigned char *buildSupervisionFrame(unsigned char A, unsigned char C){
 
 void state_machine_read_supervision_frames(unsigned char curr_byte, unsigned char A, unsigned char C, LinkLayerState *state)
 {
-    printf("Current byte: 0x%02X state: %d\n", curr_byte, *state);
+    // printf("Current byte: 0x%02X state: %d\n", curr_byte, *state);
     switch (*state)
     {
     case START:
@@ -712,7 +712,7 @@ unsigned char buildBCC2(unsigned char *buffer, int bufSize){
 
 void state_machine_read_control_frames(unsigned char curr_byte, unsigned char A, unsigned char C, LinkLayerState *state)
 {
-    printf("Current byte: 0x%02X state: %d\n", curr_byte, *state);
+    // printf("Current byte: 0x%02X state: %d\n", curr_byte, *state);
     
     switch (*state)
     {
