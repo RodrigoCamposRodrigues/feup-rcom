@@ -14,109 +14,6 @@ int fd = 0;
 unsigned char info_frame_number = I0;
 LinkLayer connectionParameters_global;
 
-// int main(int argc, char **argv)
-// {
-//     if (argc < 3)
-//     {
-//         printf("Incorrect program usage\n"
-//                "Usage: %s <SerialPort> <User>\n"
-//                "Example: %s /dev/ttyS1 0\n",
-//                argv[0],
-//                argv[0]);
-//         exit(1);
-//     }
-
-//     //create linklayer struct
-//     connectionParameters.serialPort = argv[1];
-//     if(argv[2][0] == '0') connectionParameters.role = LlTx;
-//     else if(argv[2][0] == '1') connectionParameters.role = LlRx;
-//     else exit(-1);
-//     connectionParameters.baudRate = BAUDRATE;
-//     connectionParameters.nRetransmissions = 3;
-//     connectionParameters.timeout = 3;    
-
-//     //open file
-//     FILE* file = fopen("hello.txt", "rb"); // Open the file in binary mode
-
-//     if (file == NULL) {
-//         perror("Failed to open the file");
-//         return NULL;
-//     }
-
-//     struct stat st;
-
-//     if (stat("hello.txt", &st) == -1) {
-//         perror("stat");
-//         return NULL;
-//     }
-
-//     //get the bytes from the file
-//     int file_size = st.st_size;
-
-//     // Allocate memory for the file content
-//     char* file_content = (char*)malloc(file_size);
-//     if (file_content == NULL) {
-//         perror("Failed to allocate memory for file content");
-//         fclose(file);
-//         return NULL;
-//     }
-    
-//     // Read the file content
-//     size_t read_size = fread(file_content, 1, file_size, file);
-//     if (read_size != file_size) {
-//         perror("Failed to read the file");
-//         free(file_content);
-//         fclose(file);
-//         return NULL;
-//     }
-
-//     //close file
-//     fclose(file);
-
-//     fd = llopen(connectionParameters);
-
-//     if(fd > 0){
-//         printf("Connection established!\n");
-//     }
-//     else{
-//         printf("Connection failed!\n");
-//         exit(-1);
-//     }
-
-//     switch(connectionParameters.role){
-//         case LlTx: {
-//             llwrite(file_content, file_size);
-
-//             //print file content in bytes
-//             printf("File content in bytes: ");
-//             for(int i = 0; i < file_size; i++){
-//                 printf("0x%02X ", file_content[i]);
-//             }
-//             printf("\n");
-//             break;
-//         }
-//         case LlRx: {
-//             unsigned char new_file_content[file_size];
-//             llread(&new_file_content);
-
-//             //print new file content in bytes
-//             printf("New File content in bytes: ");
-//             for(int i = 0; i < file_size; i++){
-//                 printf("0x%02X ", new_file_content[i]);
-//             }
-//             printf("\n");
-//             break;
-//         }
-//         default:
-//             break;
-//     }
-
-//     llclose(0);
-
-//     return 0;
-    
-// }
-
 ////////////////////////////////////////////////
 // LLOPEN
 ////////////////////////////////////////////////
@@ -162,6 +59,7 @@ int llopen(LinkLayer connectionParameters)
 
             }
             
+            alarm(0);
             alarm_reached_end = TRUE;
             retransmissions = connectionParameters.nRetransmissions;
 
@@ -217,14 +115,15 @@ int llwrite(const unsigned char *buf, int bufSize)
 
     int frame_info_size = buildFrameInfo(frame_info, buf, bufSize);
 
-    printf("Frame info: ");
-    for(int i = 0; i < frame_info_size; i++){
-        printf("0x%02X ", frame_info[i]);
-    }
-    printf("\n");
+    // printf("Frame info: ");
+    // for(int i = 0; i < frame_info_size; i++){
+    //     printf("0x%02X ", frame_info[i]);
+    // }
+    // printf("\n");
 
     (void)signal(SIGALRM, alarmHandler);
 
+    alarmCount = 0;
     int current_transmition = 0;
     LinkLayerState state = START;
 
@@ -256,6 +155,7 @@ int llwrite(const unsigned char *buf, int bufSize)
         }
     }
 
+    alarm(0);
     alarm_reached_end = TRUE;
 
     if(state != STOP_READING){
@@ -504,7 +404,6 @@ int llclose(int showStatistics)
                 if(bytes_read > 0){
                     state_machine_read_supervision_frames(received_byte, A_SENDER, DISC, &state);
                 }
-                else break;
             }
 
             if(state == STOP_READING){
@@ -521,7 +420,6 @@ int llclose(int showStatistics)
                     if(bytes_read > 0){
                         state_machine_read_supervision_frames(received_byte, A_SENDER, UA, &state);
                     }
-                    else break;
                 }
 
                 if(state == STOP_READING){
@@ -575,7 +473,7 @@ int connect_to_serialPort(const char *serialPort){
     // Set input mode (non-canonical, no echo,...)
     newtio.c_lflag = 0;
     newtio.c_cc[VTIME] = 0; // Inter-character timer unused
-    newtio.c_cc[VMIN] = 1;  // Blocking read until 5 chars received
+    newtio.c_cc[VMIN] = 0;  // Blocking read until 5 chars received
 
     // Flushes data received but not read
     tcflush(fd, TCIOFLUSH);
