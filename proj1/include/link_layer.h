@@ -17,25 +17,26 @@
 typedef enum
 {
     LlTx,
-    LlRx,
+    LlRx
 } LinkLayerRole;
 
 typedef enum
 {
    START,
-   FLAG_RCV,
-   A_RCV,
-   C_RCV,
+   FLAG_RECEIVED,
+   A_RECEIVED,
+   C_RECEIVED,
    BCC1_CHECKED,
    FOUND_ESC,
    READING_DATA,
+   STOP_READING,
    DISCONNECTED,
    BCC2_CHECKED
 } LinkLayerState;
 
 typedef struct
 {
-    char serialPort[50];
+    const char *serialPort;
     LinkLayerRole role;
     int baudRate;
     int nRetransmissions;
@@ -68,6 +69,11 @@ typedef struct
 #define REJ1 0x81
 #define UA 0x07
 #define SET 0x03
+#define DISC 0x0B
+#define ESCAPE 0x7D
+#define ESCAPE_FLAG 0x5E
+#define ESCAPE_ESCAPE 0x5D
+
 
 // Open a connection using the "port" parameters defined in struct linkLayer.
 // Return "1" on success or "-1" on error.
@@ -91,5 +97,15 @@ int connect_to_serialPort(const char *serialPort);
 void alarmHandler(int signal);
 
 unsigned char *buildSupervisionFrame(unsigned char A, unsigned char C);
+
+void state_machine_read_supervision_frames(unsigned char curr_byte, unsigned char A, unsigned char C, LinkLayerState *state);
+
+int buildFrameInfo(unsigned char *frame_info, unsigned char *buffer, int bufSize);
+
+unsigned char buildBCC2(unsigned char *buffer, int length);
+
+void state_machine_read_control_frames(unsigned char curr_byte, unsigned char A, unsigned char C, LinkLayerState *state);
+
+int checkBCC2(unsigned char *packet, int packetSize, unsigned char bcc2);
 
 #endif // _LINK_LAYER_H_
