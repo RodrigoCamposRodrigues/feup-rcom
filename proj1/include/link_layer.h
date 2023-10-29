@@ -104,7 +104,7 @@ int buildFrameInfo(unsigned char *frame_info, unsigned char *buffer, int bufSize
 
 unsigned char buildBCC2(unsigned char *buffer, int length);
 
-void state_machine_read_control_frames(unsigned char curr_byte, unsigned char A, unsigned char C, LinkLayerState *state);
+void state_machine_read_control_frames(unsigned char curr_byte, unsigned char A, LinkLayerState *state);
 
 int checkBCC2(unsigned char *packet, int packetSize, unsigned char bcc2);
 

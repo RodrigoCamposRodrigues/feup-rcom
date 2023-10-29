@@ -12,110 +12,9 @@ int retransmissions = 0;
 int STOP = FALSE;
 int fd = 0;
 unsigned char info_frame_number = I0;
+unsigned char C_control_frame = 0x00;
+volatile int FRAME_INVALID = FALSE;
 LinkLayer connectionParameters_global;
-
-// int main(int argc, char **argv)
-// {
-//     if (argc < 3)
-//     {
-//         printf("Incorrect program usage\n"
-//                "Usage: %s <SerialPort> <User>\n"
-//                "Example: %s /dev/ttyS1 0\n",
-//                argv[0],
-//                argv[0]);
-//         exit(1);
-//     }
-
-//     //create linklayer struct
-//     connectionParameters.serialPort = argv[1];
-//     if(argv[2][0] == '0') connectionParameters.role = LlTx;
-//     else if(argv[2][0] == '1') connectionParameters.role = LlRx;
-//     else exit(-1);
-//     connectionParameters.baudRate = BAUDRATE;
-//     connectionParameters.nRetransmissions = 3;
-//     connectionParameters.timeout = 3;    
-
-//     //open file
-//     FILE* file = fopen("hello.txt", "rb"); // Open the file in binary mode
-
-//     if (file == NULL) {
-//         perror("Failed to open the file");
-//         return NULL;
-//     }
-
-//     struct stat st;
-
-//     if (stat("hello.txt", &st) == -1) {
-//         perror("stat");
-//         return NULL;
-//     }
-
-//     //get the bytes from the file
-//     int file_size = st.st_size;
-
-//     // Allocate memory for the file content
-//     char* file_content = (char*)malloc(file_size);
-//     if (file_content == NULL) {
-//         perror("Failed to allocate memory for file content");
-//         fclose(file);
-//         return NULL;
-//     }
-    
-//     // Read the file content
-//     size_t read_size = fread(file_content, 1, file_size, file);
-//     if (read_size != file_size) {
-//         perror("Failed to read the file");
-//         free(file_content);
-//         fclose(file);
-//         return NULL;
-//     }
-
-//     //close file
-//     fclose(file);
-
-//     fd = llopen(connectionParameters);
-
-//     if(fd > 0){
-//         printf("Connection established!\n");
-//     }
-//     else{
-//         printf("Connection failed!\n");
-//         exit(-1);
-//     }
-
-//     switch(connectionParameters.role){
-//         case LlTx: {
-//             llwrite(file_content, file_size);
-
-//             //print file content in bytes
-//             printf("File content in bytes: ");
-//             for(int i = 0; i < file_size; i++){
-//                 printf("0x%02X ", file_content[i]);
-//             }
-//             printf("\n");
-//             break;
-//         }
-//         case LlRx: {
-//             unsigned char new_file_content[file_size];
-//             llread(&new_file_content);
-
-//             //print new file content in bytes
-//             printf("New File content in bytes: ");
-//             for(int i = 0; i < file_size; i++){
-//                 printf("0x%02X ", new_file_content[i]);
-//             }
-//             printf("\n");
-//             break;
-//         }
-//         default:
-//             break;
-//     }
-
-//     llclose(0);
-
-//     return 0;
-    
-// }
 
 ////////////////////////////////////////////////
 // LLOPEN
@@ -244,16 +143,17 @@ int llwrite(const unsigned char *buf, int bufSize)
         while(state != STOP_READING){
             int bytes_read = read(fd, &received_byte, 1);
             
-            if(bytes_read > 0){
-                if(info_frame_number == I0){
-                    state_machine_read_control_frames(received_byte, A_RECEIVER, RR1, &state);
-                }
-                else if(info_frame_number == I1){ 
-                    state_machine_read_control_frames(received_byte, A_RECEIVER, RR0, &state);
-                }
-            }
+            if(bytes_read > 0) state_machine_read_control_frames(received_byte, A_RECEIVER, &state);
             else break;
         }
+
+        if (C_control_frame == RR0 || C_control_frame == RR1) {
+            printf("Frame is Valid. Moving to the next packet.\n");
+        }
+        else if (C_control_frame == REJ0 || C_control_frame == REJ1) {
+            printf("Frame is invalid. Repeating write.\n");
+        }
+        if (FRAME_INVALID == TRUE) state = START;
     }
 
     alarm_reached_end = TRUE;
@@ -387,11 +287,25 @@ int llread(unsigned char *packet)
                         state = STOP_READING;
                     } 
                     else {
-                        // Frame is invalid -> Abort read.
+                        // Frame is invalid -> Send reject signal.
+                        switch (frame_type)
+                        {
+                            case I0:
+                                //send reject frame
+                                unsigned char REJ0_frame[5] = {FLAG, A_RECEIVER, REJ0, A_RECEIVER ^ REJ0, FLAG};
+                                write(fd, REJ0_frame, 5);
+                                break;
+                            case I1:
+                                //send reject frame
+                                unsigned char REJ1_frame[5] = {FLAG, A_RECEIVER, REJ1, A_RECEIVER ^ REJ1, FLAG};
+                                write(fd, REJ1_frame, 5);
+                                break;
+                        }
                         printf("BCC2 is invalid!\n");
                         state = START;
                         frame_index = 0;
-                        return -1;
+                        packet_index = 0;
+                        frame_size = 6;
                     }
                 }
                 else {
@@ -710,7 +624,7 @@ unsigned char buildBCC2(unsigned char *buffer, int bufSize){
     return BCC2;   
 }
 
-void state_machine_read_control_frames(unsigned char curr_byte, unsigned char A, unsigned char C, LinkLayerState *state)
+void state_machine_read_control_frames(unsigned char curr_byte, unsigned char A, LinkLayerState *state)
 {
     // printf("Current byte: 0x%02X state: %d\n", curr_byte, *state);
     
@@ -733,15 +647,17 @@ void state_machine_read_control_frames(unsigned char curr_byte, unsigned char A,
     case A_RECEIVED:
         if (curr_byte == FLAG)
             *state = FLAG_RECEIVED;
-        else if (curr_byte == C)
+        else if (curr_byte == RR0 || curr_byte == RR1 || curr_byte == REJ0 || curr_byte == REJ1) {
             *state = C_RECEIVED;
+            C_control_frame = curr_byte;
+        }
         else
             *state = START;
         break;
     case C_RECEIVED:
         if (curr_byte == FLAG)
             *state = FLAG_RECEIVED;
-        else if (curr_byte == A ^ C)
+        else if (curr_byte == A ^ C_control_frame)
             *state = BCC1_CHECKED;
         else
             *state = START;
@@ -752,11 +668,16 @@ void state_machine_read_control_frames(unsigned char curr_byte, unsigned char A,
             printf("Read frame successfully!\n");
             *state = STOP_READING;
 
-            if(C == RR0){
+            if(C_control_frame == RR0){
                 info_frame_number = I0;
+                FRAME_INVALID = FALSE;
             }
-            else if(C == RR1){
+            else if(C_control_frame == RR1){
                 info_frame_number = I1;
+                FRAME_INVALID = FALSE;
+            }
+            else if (C_control_frame == REJ0 || C_control_frame == REJ1){
+                FRAME_INVALID = TRUE;
             }
         }
         else
