@@ -12,6 +12,8 @@ int retransmissions = 0;
 int STOP = FALSE;
 int fd = 0;
 unsigned char info_frame_number = I0;
+unsigned char C_control_frame = 0x00;
+volatile int FRAME_INVALID = FALSE;
 LinkLayer connectionParameters_global;
 
 ////////////////////////////////////////////////
@@ -88,6 +90,8 @@ int llopen(LinkLayer connectionParameters)
 
             printf("Successfully read SET frame!\n");
 
+            sleep(5);
+
             unsigned char UA_frame[5] = {FLAG, A_RECEIVER, UA, A_RECEIVER ^ UA, FLAG};
 
             int bytes_written = write(fd, UA_frame, 5);
@@ -139,19 +143,18 @@ int llwrite(const unsigned char *buf, int bufSize)
         
         unsigned char received_byte;
         state = START;
+        FRAME_INVALID = TRUE;
 
-        while(state != STOP_READING){
+        while((alarm_reached_end != TRUE) && (state != STOP_READING)){
             int bytes_read = read(fd, &received_byte, 1);
             
-            if(bytes_read > 0){
-                if(info_frame_number == I0){
-                    state_machine_read_control_frames(received_byte, A_RECEIVER, RR1, &state);
-                }
-                else if(info_frame_number == I1){ 
-                    state_machine_read_control_frames(received_byte, A_RECEIVER, RR0, &state);
-                }
-            }
-            else break;
+            if(bytes_read > 0) state_machine_read_control_frames(received_byte, A_RECEIVER, &state);
+            // else break;
+        }
+
+        if (FRAME_INVALID == TRUE) {
+            state = START;
+            printf("Frame is invalid. Repeating write.\n");
         }
     }
 
@@ -286,11 +289,25 @@ int llread(unsigned char *packet)
                         state = STOP_READING;
                     } 
                     else {
-                        // Frame is invalid -> Abort read.
+                        // Frame is invalid -> Send reject signal.
+                        switch (frame_type)
+                        {
+                            case I0:
+                                //send reject frame
+                                unsigned char REJ0_frame[5] = {FLAG, A_RECEIVER, REJ0, A_RECEIVER ^ REJ0, FLAG};
+                                write(fd, REJ0_frame, 5);
+                                break;
+                            case I1:
+                                //send reject frame
+                                unsigned char REJ1_frame[5] = {FLAG, A_RECEIVER, REJ1, A_RECEIVER ^ REJ1, FLAG};
+                                write(fd, REJ1_frame, 5);
+                                break;
+                        }
                         printf("BCC2 is invalid!\n");
                         state = START;
                         frame_index = 0;
-                        return -1;
+                        packet_index = 0;
+                        frame_size = 6;
                     }
                 }
                 else {
@@ -600,7 +617,7 @@ unsigned char buildBCC2(const unsigned char *buffer, int bufSize){
     return BCC2;   
 }
 
-void state_machine_read_control_frames(unsigned char curr_byte, unsigned char A, unsigned char C, LinkLayerState *state)
+void state_machine_read_control_frames(unsigned char curr_byte, unsigned char A, LinkLayerState *state)
 {
     // printf("Current byte: 0x%02X state: %d\n", curr_byte, *state);
     
@@ -623,15 +640,17 @@ void state_machine_read_control_frames(unsigned char curr_byte, unsigned char A,
     case A_RECEIVED:
         if (curr_byte == FLAG)
             *state = FLAG_RECEIVED;
-        else if (curr_byte == C)
+        else if (curr_byte == RR0 || curr_byte == RR1 || curr_byte == REJ0 || curr_byte == REJ1) {
             *state = C_RECEIVED;
+            C_control_frame = curr_byte;
+        }
         else
             *state = START;
         break;
     case C_RECEIVED:
         if (curr_byte == FLAG)
             *state = FLAG_RECEIVED;
-        else if (curr_byte == (A ^ C))
+        else if(curr_byte == (A ^ C_control_frame))
             *state = BCC1_CHECKED;
         else
             *state = START;
@@ -642,11 +661,16 @@ void state_machine_read_control_frames(unsigned char curr_byte, unsigned char A,
             printf("Read frame successfully!\n");
             *state = STOP_READING;
 
-            if(C == RR0){
+            if(C_control_frame == RR0){
                 info_frame_number = I0;
+                FRAME_INVALID = FALSE;
             }
-            else if(C == RR1){
+            else if(C_control_frame == RR1){
                 info_frame_number = I1;
+                FRAME_INVALID = FALSE;
+            }
+            else if (C_control_frame == REJ0 || C_control_frame == REJ1){
+                FRAME_INVALID = TRUE;
             }
         }
         else
