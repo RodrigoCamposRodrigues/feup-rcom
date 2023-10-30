@@ -181,11 +181,10 @@ int llread(unsigned char *packet)
     unsigned char frame[MAX_PAYLOAD_SIZE * 2 + 2 + 4];
     int frame_index = 0;
     int packet_index = 0;
-    int file_index = 0;
 
     while (state != STOP_READING)
     {
-        int bytes_read = read(fd, &received_byte, 1);
+        read(fd, &received_byte, 1);
         //print received byte
         // printf("Received byte: 0x%02X\n", received_byte); 
         // printf("State: %d\n", state);
@@ -274,12 +273,12 @@ int llread(unsigned char *packet)
                         {
                             case I0:
                                 //send answer
-                                unsigned char RR1_frame[5] = {FLAG, A_RECEIVER, RR1, A_RECEIVER ^ RR0, FLAG};
+                                unsigned char RR1_frame[5] = {FLAG, A_RECEIVER, RR1, A_RECEIVER ^ RR1, FLAG};
                                 write(fd, RR1_frame, 5);
                                 break;
                             case I1:
                                 //send answer
-                                unsigned char RR0_frame[5] = {FLAG, A_RECEIVER, RR0, A_RECEIVER ^ RR1, FLAG};
+                                unsigned char RR0_frame[5] = {FLAG, A_RECEIVER, RR0, A_RECEIVER ^ RR0, FLAG};
                                 write(fd, RR0_frame, 5);
                                 break;
                         }
@@ -499,13 +498,6 @@ void alarmHandler(int signal)
     printf("Alarm count: %d\n", alarmCount);
 }
 
-unsigned char *buildSupervisionFrame(unsigned char A, unsigned char C){
-    
-    unsigned char supervision_frame[5] = {FLAG, A, C, A ^ C, FLAG};
-
-    return supervision_frame;
-}
-
 void state_machine_read_supervision_frames(unsigned char curr_byte, unsigned char A, unsigned char C, LinkLayerState *state)
 {
     // printf("Current byte: 0x%02X state: %d\n", curr_byte, *state);
@@ -536,7 +528,7 @@ void state_machine_read_supervision_frames(unsigned char curr_byte, unsigned cha
     case C_RECEIVED:
         if (curr_byte == FLAG)
             *state = FLAG_RECEIVED;
-        else if (curr_byte == A ^ C)
+        else if (curr_byte == (A ^ C))
             *state = BCC1_CHECKED;
         else
             *state = START;
@@ -554,7 +546,7 @@ void state_machine_read_supervision_frames(unsigned char curr_byte, unsigned cha
     }
 }
 
-int buildFrameInfo(unsigned char *frame_info, unsigned char *buffer, int bufSize){
+int buildFrameInfo(unsigned char *frame_info, const unsigned char *buffer, int bufSize){
     frame_info[0] = FLAG;
     frame_info[1] = A_SENDER;
     frame_info[2] = info_frame_number;
@@ -597,7 +589,7 @@ int buildFrameInfo(unsigned char *frame_info, unsigned char *buffer, int bufSize
     return j + 1;
 }
 
-unsigned char buildBCC2(unsigned char *buffer, int bufSize){
+unsigned char buildBCC2(const unsigned char *buffer, int bufSize){
     unsigned char BCC2 = buffer[0];
 
     for (int i = 1; i < bufSize; i++)
@@ -639,7 +631,7 @@ void state_machine_read_control_frames(unsigned char curr_byte, unsigned char A,
     case C_RECEIVED:
         if (curr_byte == FLAG)
             *state = FLAG_RECEIVED;
-        else if (curr_byte == A ^ C)
+        else if (curr_byte == (A ^ C))
             *state = BCC1_CHECKED;
         else
             *state = START;
