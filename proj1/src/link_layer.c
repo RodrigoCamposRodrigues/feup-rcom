@@ -90,6 +90,8 @@ int llopen(LinkLayer connectionParameters)
 
             printf("Successfully read SET frame!\n");
 
+            sleep(5);
+
             unsigned char UA_frame[5] = {FLAG, A_RECEIVER, UA, A_RECEIVER ^ UA, FLAG};
 
             int bytes_written = write(fd, UA_frame, 5);
@@ -141,21 +143,19 @@ int llwrite(const unsigned char *buf, int bufSize)
         
         unsigned char received_byte;
         state = START;
+        FRAME_INVALID = TRUE;
 
-        while(state != STOP_READING){
+        while((alarm_reached_end != TRUE) && (state != STOP_READING)){
             int bytes_read = read(fd, &received_byte, 1);
             
             if(bytes_read > 0) state_machine_read_control_frames(received_byte, A_RECEIVER, &state);
-            else break;
+            // else break;
         }
 
-        if (C_control_frame == RR0 || C_control_frame == RR1) {
-            printf("Frame is Valid. Moving to the next packet.\n");
-        }
-        else if (C_control_frame == REJ0 || C_control_frame == REJ1) {
+        if (FRAME_INVALID == TRUE) {
+            state = START;
             printf("Frame is invalid. Repeating write.\n");
         }
-        if (FRAME_INVALID == TRUE) state = START;
     }
 
     alarm(0);
@@ -277,12 +277,12 @@ int llread(unsigned char *packet)
                         {
                             case I0:
                                 //send answer
-                                unsigned char RR1_frame[5] = {FLAG, A_RECEIVER, RR1, A_RECEIVER ^ RR0, FLAG};
+                                unsigned char RR1_frame[5] = {FLAG, A_RECEIVER, RR1, A_RECEIVER ^ RR1, FLAG};
                                 write(fd, RR1_frame, 5);
                                 break;
                             case I1:
                                 //send answer
-                                unsigned char RR0_frame[5] = {FLAG, A_RECEIVER, RR0, A_RECEIVER ^ RR1, FLAG};
+                                unsigned char RR0_frame[5] = {FLAG, A_RECEIVER, RR0, A_RECEIVER ^ RR0, FLAG};
                                 write(fd, RR0_frame, 5);
                                 break;
                         }
