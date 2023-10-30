@@ -61,6 +61,7 @@ int llopen(LinkLayer connectionParameters)
 
             }
             
+            alarm(0);
             alarm_reached_end = TRUE;
             retransmissions = connectionParameters.nRetransmissions;
 
@@ -116,14 +117,15 @@ int llwrite(const unsigned char *buf, int bufSize)
 
     int frame_info_size = buildFrameInfo(frame_info, buf, bufSize);
 
-    printf("Frame info: ");
-    for(int i = 0; i < frame_info_size; i++){
-        printf("0x%02X ", frame_info[i]);
-    }
-    printf("\n");
+    // printf("Frame info: ");
+    // for(int i = 0; i < frame_info_size; i++){
+    //     printf("0x%02X ", frame_info[i]);
+    // }
+    // printf("\n");
 
     (void)signal(SIGALRM, alarmHandler);
 
+    alarmCount = 0;
     int current_transmition = 0;
     LinkLayerState state = START;
 
@@ -156,6 +158,7 @@ int llwrite(const unsigned char *buf, int bufSize)
         if (FRAME_INVALID == TRUE) state = START;
     }
 
+    alarm(0);
     alarm_reached_end = TRUE;
 
     if(state != STOP_READING){
@@ -418,7 +421,6 @@ int llclose(int showStatistics)
                 if(bytes_read > 0){
                     state_machine_read_supervision_frames(received_byte, A_SENDER, DISC, &state);
                 }
-                else break;
             }
 
             if(state == STOP_READING){
@@ -435,7 +437,6 @@ int llclose(int showStatistics)
                     if(bytes_read > 0){
                         state_machine_read_supervision_frames(received_byte, A_SENDER, UA, &state);
                     }
-                    else break;
                 }
 
                 if(state == STOP_READING){
@@ -489,7 +490,7 @@ int connect_to_serialPort(const char *serialPort){
     // Set input mode (non-canonical, no echo,...)
     newtio.c_lflag = 0;
     newtio.c_cc[VTIME] = 0; // Inter-character timer unused
-    newtio.c_cc[VMIN] = 1;  // Blocking read until 5 chars received
+    newtio.c_cc[VMIN] = 0;  // Blocking read until 5 chars received
 
     // Flushes data received but not read
     tcflush(fd, TCIOFLUSH);
