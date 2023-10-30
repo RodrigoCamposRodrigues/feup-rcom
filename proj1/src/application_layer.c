@@ -93,7 +93,6 @@ int parseControlPacket(unsigned char *received_packet, int received_packet_size,
 int packetRecognition(unsigned char *received_packet, int received_packet_size)
 {
     unsigned char *file_name[40];
-    int received_file_size;
     FILE* new_file;
     
     printf("received_packet[0]: %d\n", received_packet[0]);
@@ -103,7 +102,7 @@ int packetRecognition(unsigned char *received_packet, int received_packet_size)
         {
             printf("Start in packetRecognition\n");
             //start packet received
-            received_file_size = parseControlPacket(received_packet, received_packet_size, file_name);
+            parseControlPacket(received_packet, received_packet_size, file_name);
 
             new_file = fopen(file_name, "wb+");
             if(new_file == NULL)
@@ -186,10 +185,10 @@ void applicationLayer(const char *serialPort, const char *role, int baudRate,
             int prev = ftell(file);
             fseek(file, 0, SEEK_END);
             int file_size = ftell(file) - prev;
-            printf("File size: %ld\n", file_size);
+            printf("File size: %d\n", file_size);
             fseek(file, 0, SEEK_SET);
 
-            sleep(5);
+            // sleep(5);
 
             if(sendControlPacket(2, file_size, filename) < 0){
                 printf("Error sending start control packet\n");
@@ -219,7 +218,7 @@ void applicationLayer(const char *serialPort, const char *role, int baudRate,
                 unsigned char data_packet[data_size_to_send + 3];
                 data_packet_size = buildDataPacket(data_to_send, data_size_to_send, data_packet);
 
-                sleep(5);
+                // sleep(5);
 
                 if (llwrite(data_packet, data_packet_size) < 0) {
                     printf("Error sending data packet\n");
@@ -229,7 +228,7 @@ void applicationLayer(const char *serialPort, const char *role, int baudRate,
                 bytes_left_to_send -= data_size_to_send;
             }
 
-            sleep(5);
+            // sleep(5);
 
             if (sendControlPacket(3, file_size, filename) < 0) {
                 printf("Error sending end control packet\n");
@@ -238,7 +237,7 @@ void applicationLayer(const char *serialPort, const char *role, int baudRate,
 
             printf("End control packet sent\n");
 
-            sleep(5);
+            // sleep(5);
 
             llclose(fd); 
             break;}
