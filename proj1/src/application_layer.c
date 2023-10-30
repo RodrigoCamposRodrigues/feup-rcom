@@ -93,7 +93,6 @@ int parseControlPacket(unsigned char *received_packet, int received_packet_size,
 int packetRecognition(unsigned char *received_packet, int received_packet_size)
 {
     unsigned char *file_name[40];
-    int received_file_size;
     FILE* new_file;
     
     printf("received_packet[0]: %d\n", received_packet[0]);
@@ -103,7 +102,7 @@ int packetRecognition(unsigned char *received_packet, int received_packet_size)
         {
             printf("Start in packetRecognition\n");
             //start packet received
-            received_file_size = parseControlPacket(received_packet, received_packet_size, file_name);
+            parseControlPacket(received_packet, received_packet_size, file_name);
 
             new_file = fopen(file_name, "wb+");
             if(new_file == NULL)
@@ -186,7 +185,7 @@ void applicationLayer(const char *serialPort, const char *role, int baudRate,
             int prev = ftell(file);
             fseek(file, 0, SEEK_END);
             int file_size = ftell(file) - prev;
-            printf("File size: %ld\n", file_size);
+            printf("File size: %d\n", file_size);
             fseek(file, 0, SEEK_SET);
 
             // sleep(5);

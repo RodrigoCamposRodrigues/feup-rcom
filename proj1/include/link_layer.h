@@ -100,9 +100,9 @@ unsigned char *buildSupervisionFrame(unsigned char A, unsigned char C);
 
 void state_machine_read_supervision_frames(unsigned char curr_byte, unsigned char A, unsigned char C, LinkLayerState *state);
 
-int buildFrameInfo(unsigned char *frame_info, unsigned char *buffer, int bufSize);
+int buildFrameInfo(unsigned char *frame_info, const unsigned char *buffer, int bufSize);
 
-unsigned char buildBCC2(unsigned char *buffer, int length);
+unsigned char buildBCC2(const unsigned char *buffer, int length);
 
 void state_machine_read_control_frames(unsigned char curr_byte, unsigned char A, unsigned char C, LinkLayerState *state);
 
