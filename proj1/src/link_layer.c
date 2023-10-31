@@ -187,12 +187,10 @@ int llread(unsigned char *packet)
 
     while (state != STOP_READING)
     {
-        read(fd, &received_byte, 1);
-        //print received byte
+        int bytes_read = read(fd, &received_byte, 1);
         // printf("Received byte: 0x%02X\n", received_byte); 
         // printf("State: %d\n", state);
-        // if (bytes_read <= 0) break;
-
+        if(bytes_read <= 0) continue;
         switch (state) {
             case START:
                 if (received_byte == FLAG) {
