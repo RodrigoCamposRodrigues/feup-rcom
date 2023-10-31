@@ -58,7 +58,7 @@ int buildDataPacket(unsigned char *data_to_send, int data_size_to_send, unsigned
     return data_packet_size;
 }
 
-int parseControlPacket(unsigned char *received_packet, int received_packet_size, unsigned char *received_filename){
+int parseControlPacket(unsigned char *received_packet, int received_packet_size){
     
     int received_file_size_bytes = received_packet[2];
     printf("Received file size bytes: %d\n", received_file_size_bytes);
@@ -76,6 +76,7 @@ int parseControlPacket(unsigned char *received_packet, int received_packet_size,
     printf("Received file size: %d\n", received_file_size);
 
     int received_filename_bytes = received_packet[received_file_size_bytes + 4];
+    char received_filename[received_filename_bytes + 1];
     printf("Received filename bytes: %d\n", received_filename_bytes);
 
     for(int i = 0; i < received_filename_bytes; i++)
@@ -90,11 +91,8 @@ int parseControlPacket(unsigned char *received_packet, int received_packet_size,
     return received_file_size;
 }
 
-int packetRecognition(unsigned char *received_packet, int received_packet_size)
-{
-    unsigned char *file_name[40];
-    FILE* new_file;
-    
+int packetRecognition(unsigned char *received_packet, int received_packet_size, FILE *new_file)
+{    
     printf("received_packet[0]: %d\n", received_packet[0]);
     switch(received_packet[0])
     {
@@ -102,14 +100,18 @@ int packetRecognition(unsigned char *received_packet, int received_packet_size)
         {
             printf("Start in packetRecognition\n");
             //start packet received
-            parseControlPacket(received_packet, received_packet_size, file_name);
-
-            new_file = fopen(file_name, "wb+");
-            if(new_file == NULL)
+            if(parseControlPacket(received_packet, received_packet_size) < 0)
             {
-                printf("Error opening file\n");
+                printf("Error parsing control packet\n");
                 exit(-1);
             }
+
+            // new_file = fopen(filename, "wb+");
+            // if(new_file == NULL)
+            // {
+            //     printf("Error opening file\n");
+            //     exit(-1);
+            // }
 
             return TRUE;
         }
@@ -241,8 +243,8 @@ void applicationLayer(const char *serialPort, const char *role, int baudRate,
 
             llclose(fd); 
             break;}
-        case LlRx:
-{
+        case LlRx:{               
+            FILE *new_file = fopen(filename, "wb+");
             while(1){
                 //call llread
                 unsigned char received_packet[MAX_PAYLOAD_SIZE];
@@ -261,7 +263,9 @@ void applicationLayer(const char *serialPort, const char *role, int baudRate,
                     exit(-1);
                 }
 
-                if(packetRecognition(received_packet, received_packet_size) == FALSE)
+                
+
+                if(packetRecognition(received_packet, received_packet_size, new_file) == FALSE)
                     break;
             }
 

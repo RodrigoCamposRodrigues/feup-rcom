@@ -90,7 +90,7 @@ int llopen(LinkLayer connectionParameters)
 
             printf("Successfully read SET frame!\n");
 
-            sleep(5);
+            // sleep(5);
 
             unsigned char UA_frame[5] = {FLAG, A_RECEIVER, UA, A_RECEIVER ^ UA, FLAG};
 
@@ -275,15 +275,15 @@ int llread(unsigned char *packet)
                         switch (frame_type)
                         {
                             case I0:
-                                //send answer
+                               { //send answer
                                 unsigned char RR1_frame[5] = {FLAG, A_RECEIVER, RR1, A_RECEIVER ^ RR1, FLAG};
                                 write(fd, RR1_frame, 5);
-                                break;
+                                break;}
                             case I1:
-                                //send answer
+                                {//send answer
                                 unsigned char RR0_frame[5] = {FLAG, A_RECEIVER, RR0, A_RECEIVER ^ RR0, FLAG};
                                 write(fd, RR0_frame, 5);
-                                break;
+                                break;}
                         }
 
                         state = STOP_READING;
@@ -293,15 +293,15 @@ int llread(unsigned char *packet)
                         switch (frame_type)
                         {
                             case I0:
-                                //send reject frame
+                                {//send reject frame
                                 unsigned char REJ0_frame[5] = {FLAG, A_RECEIVER, REJ0, A_RECEIVER ^ REJ0, FLAG};
                                 write(fd, REJ0_frame, 5);
-                                break;
+                                break;}
                             case I1:
-                                //send reject frame
+                                {//send reject frame
                                 unsigned char REJ1_frame[5] = {FLAG, A_RECEIVER, REJ1, A_RECEIVER ^ REJ1, FLAG};
                                 write(fd, REJ1_frame, 5);
-                                break;
+                                break;}
                         }
                         printf("BCC2 is invalid!\n");
                         state = START;
@@ -372,7 +372,7 @@ int llclose(int showStatistics)
 
     switch (connectionParameters_global.role) {
         case LlTx:
-            printf("Closing connection as sender...\n");
+            {printf("Closing connection as sender...\n");
 
             unsigned char DISC_frame_tx[5] = {FLAG, A_SENDER, DISC, A_SENDER ^ DISC, FLAG};
 
@@ -408,10 +408,10 @@ int llclose(int showStatistics)
                 return -1;
             }
             
-            break;
+            break;}
 
         case LlRx:
-            unsigned char received_byte;
+            {unsigned char received_byte;
 
             while(state != STOP_READING){
 
@@ -451,7 +451,7 @@ int llclose(int showStatistics)
                 return -1;
             }
 
-            break;
+            break;}
     }
 
     printf("Terminating program...\n");
