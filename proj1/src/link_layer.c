@@ -258,7 +258,7 @@ int llread(unsigned char *packet)
                     int packetSize = frame_size - 6;
                     // state = FLAG_RECEIVED;
                     for (int i = 4; i < frame_index - 1; i++) {
-                        printf("0x%02X ", frame[i]);
+                        // printf("0x%02X ", frame[i]);
                         packet[packet_index++] = frame[i];
                     }
                     packet[packet_index] = '\0';
@@ -340,11 +340,11 @@ int llread(unsigned char *packet)
     }
 
     //print new packet content in bytes
-    printf("Packet (new_content) content in bytes: ");
-    for(int i = 0; i < packet_index; i++){
-        printf("0x%02X ", packet[i]);
-    }
-    printf("\n");
+    // printf("Packet (new_content) content in bytes: ");
+    // for(int i = 0; i < packet_index; i++){
+    //     printf("0x%02X ", packet[i]);
+    // }
+    // printf("\n");
 
     //printf("Packet (new_content) last byte: 0x%02X\n", new_content[packet_index]);
 
@@ -356,7 +356,7 @@ int llread(unsigned char *packet)
     // }
     // printf("\n");
     // printf("Packet (original) content: %s\n", packet);
-    printf("frame_index: %d\n", packet_index);
+    // printf("frame_index: %d\n", packet_index);
     return packet_index;
 }
 
