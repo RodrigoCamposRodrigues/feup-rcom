@@ -93,7 +93,7 @@ int parseControlPacket(unsigned char *received_packet, int received_packet_size)
     return received_file_size;
 }
 
-int packetRecognition(unsigned char *received_packet, int received_packet_size, FILE *new_file, unsigned char sequence_number_checker)
+int packetRecognition(unsigned char *received_packet, int received_packet_size, FILE *new_file, unsigned char sequence_number_checker, int *flag_to_change_sequence_number)
 {    
 
     printf("received_packet[0]: %d\n", received_packet[0]);
@@ -119,7 +119,11 @@ int packetRecognition(unsigned char *received_packet, int received_packet_size, 
             {
                 printf("Error: wrong sequence number\n");
                 printf("Expected: %d. Received: %d\n", sequence_number_checker, received_packet[1]);
+                *flag_to_change_sequence_number = 0;
                 return TRUE;
+            }
+            else{
+                *flag_to_change_sequence_number = 1;
             }
 
             //parse data packet
@@ -192,7 +196,7 @@ void applicationLayer(const char *serialPort, const char *role, int baudRate,
             printf("File size: %d\n", file_size);
             fseek(file, 0, SEEK_SET);
 
-            sleep(5);
+            // sleep(5);
 
             if(sendControlPacket(2, file_size, filename) < 0){
                 printf("Error sending start control packet\n");
@@ -223,7 +227,7 @@ void applicationLayer(const char *serialPort, const char *role, int baudRate,
                 unsigned char data_packet[data_size_to_send + 4];
                 data_packet_size = buildDataPacket(sequence_number, data_to_send, data_size_to_send, data_packet);
 
-                sleep(5);
+                // sleep(5);
 
                 if (llwrite(data_packet, data_packet_size) < 0) {
                     printf("Error sending data packet\n");
@@ -234,7 +238,7 @@ void applicationLayer(const char *serialPort, const char *role, int baudRate,
                 sequence_number = (sequence_number + 1) % 255;
             }
 
-            sleep(5);
+            // sleep(5);
 
             if (sendControlPacket(3, file_size, filename) < 0) {
                 printf("Error sending end control packet\n");
@@ -243,13 +247,14 @@ void applicationLayer(const char *serialPort, const char *role, int baudRate,
 
             printf("End control packet sent\n");
 
-            sleep(5);
+            // sleep(5);
 
             llclose(fd); 
             break;}
         case LlRx:{               
             FILE *new_file = fopen(filename, "wb+");
             unsigned char sequence_number_checker = 0;
+            int flag_to_change_sequence_number = 0;
             while(1){
                 //call llread
                 unsigned char received_packet[MAX_PAYLOAD_SIZE];
@@ -268,10 +273,11 @@ void applicationLayer(const char *serialPort, const char *role, int baudRate,
                     exit(-1);
                 }
 
-                if(packetRecognition(received_packet, received_packet_size, new_file, sequence_number_checker) == FALSE)
+                if(packetRecognition(received_packet, received_packet_size, new_file, sequence_number_checker, &flag_to_change_sequence_number) == FALSE)
                     break;
-                if(received_packet[0] == 1){
-                    printf("Changed sequence number\n");
+
+                if(flag_to_change_sequence_number == 1 && received_packet[0] == 1)
+                {
                     sequence_number_checker = (sequence_number_checker + 1) % 255;
                 }
             }
