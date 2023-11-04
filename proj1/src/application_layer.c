@@ -20,26 +20,9 @@ int sendControlPacket(const unsigned int C, int file_size, const char *filename)
         file_size >>= 8;
     }
 
-    //print file size bytes in control packet
-    printf("File size bytes in control packet: ");
-    for(int i = 0; i < l1; i++)
-    {
-        printf("0x%02X ", control_packet_start[3 + i]);
-    }
-    printf("\n");
-
-
     control_packet_start[3 + l1] = 1;
     control_packet_start[4 + l1] = l2;
     memcpy(control_packet_start + 5 + l1, filename, sizeof(char) * l2);
-
-    //print control packet
-    // printf("Control packet: ");
-    // for(int i = 0; i < packet_size; i++)
-    // {
-    //     printf("0x%02X ", control_packet_start[i]);
-    // }
-    // printf("\n");
 
     return llwrite(control_packet_start, packet_size);
 }
@@ -63,7 +46,7 @@ int buildDataPacket(unsigned char sequence, unsigned char *data_to_send, int dat
 int parseControlPacket(unsigned char *received_packet, int received_packet_size){
     
     int received_file_size_bytes = received_packet[2];
-    printf("Received file size bytes: %d\n", received_file_size_bytes);
+    //printf("Received file size bytes: %d\n", received_file_size_bytes);
     int received_file_size_aux[received_file_size_bytes];
     int received_file_size = 0;
 
@@ -75,11 +58,11 @@ int parseControlPacket(unsigned char *received_packet, int received_packet_size)
     {
         received_file_size |= (received_file_size_aux[received_file_size_bytes - i - 1] << (8*i));
     }
-    printf("Received file size: %d\n", received_file_size);
+    //printf("Received file size: %d\n", received_file_size);
 
     int received_filename_bytes = received_packet[received_file_size_bytes + 4];
     char received_filename[received_filename_bytes + 1];
-    printf("Received filename bytes: %d\n", received_filename_bytes);
+    //printf("Received filename bytes: %d\n", received_filename_bytes);
 
     for(int i = 0; i < received_filename_bytes; i++)
     {
@@ -96,25 +79,24 @@ int parseControlPacket(unsigned char *received_packet, int received_packet_size)
 int packetRecognition(unsigned char *received_packet, int received_packet_size, FILE *new_file, unsigned char sequence_number_checker, int *flag_to_change_sequence_number)
 {    
 
-    printf("received_packet[0]: %d\n", received_packet[0]);
     switch(received_packet[0])
     {
         case 2:
         {
-            printf("Start in packetRecognition\n");
             //start packet received
             if(parseControlPacket(received_packet, received_packet_size) < 0)
             {
-                printf("Error parsing control packet\n");
+                printf("Error parsing control packet!\n");
                 exit(-1);
             }
+
+            printf("Start control packet received!\n");
+
             return TRUE;
         }
 
         case 1:
         {
-            printf("data in packetRecognition\n");
-
             if(sequence_number_checker != received_packet[1])
             {
                 printf("Error: wrong sequence number\n");
@@ -137,15 +119,20 @@ int packetRecognition(unsigned char *received_packet, int received_packet_size, 
 
         case 3:
         {
-            printf("end in packetRecognition\n");
+            //end packet received
+            if(parseControlPacket(received_packet, received_packet_size) < 0)
+            {
+                printf("Error parsing control packet!\n");
+                exit(-1);
+            }
+
+            printf("End control packet received!\n");
 
             fclose(new_file);
-            //received end packet
-            // close(local_fd);
             return FALSE;
         }
         default:
-            printf("Invalid control packet\n");
+            printf("Invalid control packet!\n");
             exit(-1);
             break;
     }
@@ -158,15 +145,10 @@ void applicationLayer(const char *serialPort, const char *role, int baudRate,
 
     LinkLayer linkLayer;
     linkLayer.serialPort = serialPort;
-    printf("  - Serial port: %s\n", linkLayer.serialPort);
     linkLayer.role = strcmp(role, "tx") == 0 ? LlTx : LlRx;
-    printf("  - Role: %s\n", linkLayer.role == LlTx ? "Transmitter" : "Receiver");
     linkLayer.baudRate = baudRate;
-    printf("  - Baudrate: %d\n", linkLayer.baudRate);
     linkLayer.nRetransmissions = nTries;
-    printf("  - Number of tries: %d\n", linkLayer.nRetransmissions);
     linkLayer.timeout = timeout;
-    printf("  - Timeout: %d\n", linkLayer.timeout);
 
     int fd = llopen(linkLayer);
 
@@ -259,8 +241,9 @@ void applicationLayer(const char *serialPort, const char *role, int baudRate,
                 //call llread
                 unsigned char received_packet[MAX_PAYLOAD_SIZE];
                 int received_packet_size = llread(received_packet);
+
                 //print packet
-                printf("Received packet with size: %d ", received_packet_size);
+                printf("Received packet with size: %d\n ", received_packet_size);
                 for(int i = 0; i < received_packet_size; i++)
                 {
                     printf("0x%02X ", received_packet[i]);

@@ -90,8 +90,6 @@ int llopen(LinkLayer connectionParameters)
 
             printf("Successfully read SET frame!\n");
 
-            // sleep(5);
-
             unsigned char UA_frame[5] = {FLAG, A_RECEIVER, UA, A_RECEIVER ^ UA, FLAG};
 
             int bytes_written = write(fd, UA_frame, 5);
@@ -119,12 +117,6 @@ int llwrite(const unsigned char *buf, int bufSize)
 
     int frame_info_size = buildFrameInfo(frame_info, buf, bufSize);
 
-    // printf("Frame info: ");
-    // for(int i = 0; i < frame_info_size; i++){
-    //     printf("0x%02X ", frame_info[i]);
-    // }
-    // printf("\n");
-
     (void)signal(SIGALRM, alarmHandler);
 
     alarmCount = 0;
@@ -149,7 +141,6 @@ int llwrite(const unsigned char *buf, int bufSize)
             int bytes_read = read(fd, &received_byte, 1);
             
             if(bytes_read > 0) state_machine_read_control_frames(received_byte, A_RECEIVER, &state);
-            // else break;
         }
 
         if (FRAME_INVALID == TRUE) {
@@ -188,8 +179,7 @@ int llread(unsigned char *packet)
     while (state != STOP_READING)
     {
         int bytes_read = read(fd, &received_byte, 1);
-        // printf("Received byte: 0x%02X\n", received_byte); 
-        // printf("State: %d\n", state);
+        
         if(bytes_read <= 0) continue;
         switch (state) {
             case START:
@@ -258,11 +248,10 @@ int llread(unsigned char *packet)
                     int packetSize = frame_size - 6;
                     // state = FLAG_RECEIVED;
                     for (int i = 4; i < frame_index - 1; i++) {
-                        // printf("0x%02X ", frame[i]);
                         packet[packet_index++] = frame[i];
                     }
                     packet[packet_index] = '\0';
-                    printf("\n");
+
                     if (packet_index > packetSize) {
                         printf("Packet buffer is full. Aborting read.\n");
                         return -1;
@@ -339,24 +328,6 @@ int llread(unsigned char *packet)
         }  
     }
 
-    //print new packet content in bytes
-    // printf("Packet (new_content) content in bytes: ");
-    // for(int i = 0; i < packet_index; i++){
-    //     printf("0x%02X ", packet[i]);
-    // }
-    // printf("\n");
-
-    //printf("Packet (new_content) last byte: 0x%02X\n", new_content[packet_index]);
-
-    
-    //print original packet content in bytes
-    // printf("Packet (original) content in bytes: ");
-    // for(int i = 0; i <= packet_index; i++){
-    //     printf("0x%02X ", packet[i]);
-    // }
-    // printf("\n");
-    // printf("Packet (original) content: %s\n", packet);
-    // printf("frame_index: %d\n", packet_index);
     return packet_index;
 }
 
@@ -369,8 +340,8 @@ int llclose(int showStatistics)
     LinkLayerState state = START;
 
     switch (connectionParameters_global.role) {
-        case LlTx:
-            {printf("Closing connection as sender...\n");
+        case LlTx:{
+            printf("Closing connection as sender...\n");
 
             unsigned char DISC_frame_tx[5] = {FLAG, A_SENDER, DISC, A_SENDER ^ DISC, FLAG};
 
@@ -408,8 +379,8 @@ int llclose(int showStatistics)
             
             break;}
 
-        case LlRx:
-            {unsigned char received_byte;
+        case LlRx:{
+            unsigned char received_byte;
 
             while(state != STOP_READING){
 
@@ -656,7 +627,6 @@ void state_machine_read_control_frames(unsigned char curr_byte, unsigned char A,
     case BCC1_CHECKED:
         if (curr_byte == FLAG)
         {
-            printf("Read frame successfully!\n");
             *state = STOP_READING;
 
             if(C_control_frame == RR0){
