@@ -34,26 +34,28 @@ int sendControlPacket(const unsigned int C, int file_size, const char *filename)
     memcpy(control_packet_start + 5 + l1, filename, sizeof(char) * l2);
 
     //print control packet
-    printf("Control packet: ");
-    for(int i = 0; i < packet_size; i++)
-    {
-        printf("0x%02X ", control_packet_start[i]);
-    }
-    printf("\n");
+    // printf("Control packet: ");
+    // for(int i = 0; i < packet_size; i++)
+    // {
+    //     printf("0x%02X ", control_packet_start[i]);
+    // }
+    // printf("\n");
 
     return llwrite(control_packet_start, packet_size);
 }
 
-int buildDataPacket(unsigned char *data_to_send, int data_size_to_send, unsigned char *data_packet)
+int buildDataPacket(unsigned char sequence, unsigned char *data_to_send, int data_size_to_send, unsigned char *data_packet)
 {
-    int data_packet_size = 3 + data_size_to_send;
+    int data_packet_size = 4 + data_size_to_send;
 
     data_packet[0] = 1;
-    data_packet[1] = data_size_to_send / 256;
-    data_packet[2] = data_size_to_send % 256;
+    data_packet[1] = sequence;
+    printf("Sequence number: %d\n", sequence);
+    data_packet[2] = data_size_to_send / 256;
+    data_packet[3] = data_size_to_send % 256;
 
 
-    memcpy(data_packet + 3, data_to_send, data_size_to_send);
+    memcpy(data_packet + 4, data_to_send, data_size_to_send);
 
     return data_packet_size;
 }
@@ -91,8 +93,9 @@ int parseControlPacket(unsigned char *received_packet, int received_packet_size)
     return received_file_size;
 }
 
-int packetRecognition(unsigned char *received_packet, int received_packet_size, FILE *new_file)
+int packetRecognition(unsigned char *received_packet, int received_packet_size, FILE *new_file, unsigned char sequence_number_checker, int *flag_to_change_sequence_number)
 {    
+
     printf("received_packet[0]: %d\n", received_packet[0]);
     switch(received_packet[0])
     {
@@ -105,14 +108,6 @@ int packetRecognition(unsigned char *received_packet, int received_packet_size, 
                 printf("Error parsing control packet\n");
                 exit(-1);
             }
-
-            // new_file = fopen(filename, "wb+");
-            // if(new_file == NULL)
-            // {
-            //     printf("Error opening file\n");
-            //     exit(-1);
-            // }
-
             return TRUE;
         }
 
@@ -120,11 +115,22 @@ int packetRecognition(unsigned char *received_packet, int received_packet_size, 
         {
             printf("data in packetRecognition\n");
 
+            if(sequence_number_checker != received_packet[1])
+            {
+                printf("Error: wrong sequence number\n");
+                printf("Expected: %d. Received: %d\n", sequence_number_checker, received_packet[1]);
+                *flag_to_change_sequence_number = 0;
+                return TRUE;
+            }
+            else{
+                *flag_to_change_sequence_number = 1;
+            }
+
             //parse data packet
-            int data_size = received_packet[1] * 256 + received_packet[2];
+            int data_size = received_packet[2] * 256 + received_packet[3];
 
 
-            fwrite(received_packet + 3, 1, data_size, new_file);
+            fwrite(received_packet + 4, 1, data_size, new_file);
 
             return TRUE;
         }
@@ -200,25 +206,26 @@ void applicationLayer(const char *serialPort, const char *role, int baudRate,
             printf("Start control packet sent\n");
 
             //read data from file and store it in a content variable
-            int content_size = MAX_PAYLOAD_SIZE - 3;
+            int content_size = MAX_PAYLOAD_SIZE - 4;
             unsigned char content[content_size]; // Static array for file content
             // int content_index = 0;
 
             int bytes_left_to_send = file_size;
             unsigned char data_to_send[MAX_PAYLOAD_SIZE];
+            unsigned char sequence_number = 0;
 
             while (bytes_left_to_send > 0) {
                 // Read a chunk of data from the file
                 printf("Bytes left to send: %d\n", bytes_left_to_send);
-                int data_size_to_send = ((bytes_left_to_send + 3) > MAX_PAYLOAD_SIZE) ? content_size : bytes_left_to_send;
+                int data_size_to_send = ((bytes_left_to_send + 4) > MAX_PAYLOAD_SIZE) ? content_size : bytes_left_to_send;
                 fread(content, 1, data_size_to_send, file);
 
                 // Copy data to data_to_send array
                 memcpy(data_to_send, content, content_size);
 
                 int data_packet_size;
-                unsigned char data_packet[data_size_to_send + 3];
-                data_packet_size = buildDataPacket(data_to_send, data_size_to_send, data_packet);
+                unsigned char data_packet[data_size_to_send + 4];
+                data_packet_size = buildDataPacket(sequence_number, data_to_send, data_size_to_send, data_packet);
 
                 // sleep(5);
 
@@ -228,6 +235,7 @@ void applicationLayer(const char *serialPort, const char *role, int baudRate,
                 }
 
                 bytes_left_to_send -= data_size_to_send;
+                sequence_number = (sequence_number + 1) % 255;
             }
 
             // sleep(5);
@@ -245,6 +253,8 @@ void applicationLayer(const char *serialPort, const char *role, int baudRate,
             break;}
         case LlRx:{               
             FILE *new_file = fopen(filename, "wb+");
+            unsigned char sequence_number_checker = 0;
+            int flag_to_change_sequence_number = 0;
             while(1){
                 //call llread
                 unsigned char received_packet[MAX_PAYLOAD_SIZE];
@@ -263,10 +273,13 @@ void applicationLayer(const char *serialPort, const char *role, int baudRate,
                     exit(-1);
                 }
 
-                
-
-                if(packetRecognition(received_packet, received_packet_size, new_file) == FALSE)
+                if(packetRecognition(received_packet, received_packet_size, new_file, sequence_number_checker, &flag_to_change_sequence_number) == FALSE)
                     break;
+
+                if(flag_to_change_sequence_number == 1 && received_packet[0] == 1)
+                {
+                    sequence_number_checker = (sequence_number_checker + 1) % 255;
+                }
             }
 
             llclose(fd);
