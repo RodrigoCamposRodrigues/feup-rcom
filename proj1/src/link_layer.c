@@ -14,6 +14,7 @@ int fd = 0;
 unsigned char info_frame_number = I0;
 unsigned char C_control_frame = 0x00;
 volatile int FRAME_INVALID = FALSE;
+int probability_error = 50;
 LinkLayer connectionParameters_global;
 
 ////////////////////////////////////////////////
@@ -122,10 +123,24 @@ int llwrite(const unsigned char *buf, int bufSize)
     alarmCount = 0;
     int current_transmition = 0;
     LinkLayerState state = START;
+    int times_frame_sent_with_error = 0;
 
     while(current_transmition < retransmissions && state != STOP_READING){
 
-        if(alarm_reached_end == TRUE){ 
+        if(alarm_reached_end == TRUE){
+            //introduce error
+            if(probability_error != 0){
+                int random_number = rand() % 100;
+                if((random_number < probability_error) && (times_frame_sent_with_error < 1)){
+                    printf("Introducing error in BCC1\n");
+                    frame_info[3] = frame_info[3] ^ 0x01;
+                    times_frame_sent_with_error++;
+                }
+                else{
+                    frame_info[3] = frame_info[1] ^ frame_info[2];
+                }
+            }
+
             int bytes_written = write(fd, frame_info, frame_info_size);
             printf("Sent frame with information. Bytes written: %d\n", bytes_written);
             current_transmition++;
@@ -240,6 +255,7 @@ int llread(unsigned char *packet)
                 else {
                     state = START;
                     frame_index = 0;
+                    printf("BCC1 is invalid!\n");
                 }
                 break;                
             case READING_DATA:
