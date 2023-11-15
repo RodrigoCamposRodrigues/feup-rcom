@@ -13,7 +13,9 @@
 #include <termios.h>
 #include <unistd.h>
 #include <signal.h>
+#include <time.h>
 #include "link_layer.h"
+
 
 // Application layer main function.
 // Arguments:

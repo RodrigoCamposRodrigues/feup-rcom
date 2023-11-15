@@ -233,7 +233,11 @@ void applicationLayer(const char *serialPort, const char *role, int baudRate,
 
             llclose(fd); 
             break;}
-        case LlRx:{               
+        case LlRx:{
+
+            clock_t start, end;
+            start = clock();    
+
             FILE *new_file = fopen(filename, "wb+");
             unsigned char sequence_number_checker = 0;
             int flag_to_change_sequence_number = 0;
@@ -266,6 +270,11 @@ void applicationLayer(const char *serialPort, const char *role, int baudRate,
             }
 
             llclose(fd);
+
+            end = clock();
+            double time_spent = ((double) (end - start)) / CLOCKS_PER_SEC;
+            printf("Time elapsed: %f\n", time_spent);
+
             break;}
         default:
             printf("Invalid role\n");
