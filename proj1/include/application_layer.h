@@ -28,4 +28,12 @@
 void applicationLayer(const char *serialPort, const char *role, int baudRate,
                       int nTries, int timeout, const char *filename);
 
+int sendControlPacket(const unsigned int C, int file_size, const char *filename);
+
+int buildDataPacket(unsigned char sequence, unsigned char *data_to_send, int data_size_to_send, unsigned char *data_packet);
+
+int parseControlPacket(unsigned char *received_packet, int received_packet_size);
+
+int packetRecognition(unsigned char *received_packet, int received_packet_size, FILE *new_file, unsigned char sequence_number_checker, int *flag_to_change_sequence_number);
+
 #endif // _APPLICATION_LAYER_H_
