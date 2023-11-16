@@ -113,6 +113,8 @@ int llopen(LinkLayer connectionParameters)
 int llwrite(const unsigned char *buf, int bufSize)
 {
     printf("Entered llwrite\n");
+
+    srand((unsigned int) clock());
     
     unsigned char frame_info[4 + (MAX_PAYLOAD_SIZE * 2 + 2) + 2]; 
 
