@@ -24,11 +24,11 @@ int llopen(LinkLayer connectionParameters)
     printf("Entered llopen\n");
     LinkLayerState state = START;
     
-    fd = connect_to_serialPort(connectionParameters.serialPort);
-
     connectionParameters_global = connectionParameters;
     timeout = connectionParameters.timeout;
     retransmissions = connectionParameters.nRetransmissions;
+
+    fd = connect_to_serialPort(connectionParameters.serialPort);
 
     switch(connectionParameters.role){
         
@@ -451,7 +451,7 @@ int connect_to_serialPort(const char *serialPort){
     // Clear struct for new port settings
     memset(&newtio, 0, sizeof(newtio));
 
-    newtio.c_cflag = BAUDRATE | CS8 | CLOCAL | CREAD;
+    newtio.c_cflag = connectionParameters_global.baudRate | CS8 | CLOCAL | CREAD;
     newtio.c_iflag = IGNPAR;
     newtio.c_oflag = 0;
 

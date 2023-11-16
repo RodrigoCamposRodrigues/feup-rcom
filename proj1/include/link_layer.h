@@ -49,7 +49,6 @@ typedef struct
 
 // Baudrate settings are defined in <asm/termbits.h>, which is
 // included by <termios.h>
-#define BAUDRATE B38400
 #define _POSIX_SOURCE 1 // POSIX compliant source
 
 // MISC
