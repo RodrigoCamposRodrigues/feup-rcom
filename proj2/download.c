@@ -20,7 +20,7 @@ int createAndConnectSocket(char *ip) {
     bzero((char *) &server_addr, sizeof(server_addr));
     server_addr.sin_family = AF_INET;
     server_addr.sin_addr.s_addr = inet_addr(ip);    /*32 bit Internet address network byte ordered*/
-    server_addr.sin_port = htons(SERVER_PORT);        /*server TCP port must be network byte ordered */
+    server_addr.sin_port = htons(FTP_PORT);        /*server TCP port must be network byte ordered */
 
     /*open a TCP socket*/
     if ((sockfd = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
@@ -34,6 +34,52 @@ int createAndConnectSocket(char *ip) {
     }
 
     return sockfd;
+}
+
+// Handle replies from server, take into account if they are single or multiline
+int handleResponses(const int socket, char *buffer) {
+    
+    char byte;
+    int i = 0;
+    int respCode = 0;
+    FTPstate state = FTP_START_REPLY;
+
+    memset(buffer, 0, MAX_LENGTH);
+
+    while (state != FTP_END_REPLY) {
+        if (read(socket, &byte, 1) < 0) {
+            perror("read()");
+            exit(-1);
+        }
+
+        switch (state) {
+            case FTP_START_REPLY:
+                if (byte == ' ') state = FTP_SINGLE_LINE;
+                else if (byte == '-') state = FTP_MULTI_LINE;
+                else if (byte == '\n') state = FTP_END_REPLY;
+                else buffer[i++] = byte;
+                break;
+            case FTP_SINGLE_LINE:
+                if (byte == '\n') state = FTP_END_REPLY;
+                else buffer[i++] = byte;
+                break;
+            case FTP_MULTI_LINE:
+                if (byte == '\n') {
+                    memset(buffer, 0, MAX_LENGTH);
+                    i = 0;
+                    state = FTP_START_REPLY;
+                }
+                else buffer[i++] = byte;
+                break;
+            case FTP_END_REPLY:
+                break;
+            default:
+                break;
+        }
+    }
+
+    sscanf(buffer, "%d", &respCode);
+    return respCode;
 }
 
 int parseURL(const char *url, struct URL *parsed_url) {
@@ -99,15 +145,34 @@ int parseURL(const char *url, struct URL *parsed_url) {
 
 int authenticateAndConnect(const int socket, const char* user, const char* password) {
 
+    // Store user and password commands
     char userInput[5+strlen(user)+1];
+    sprintf(userInput, "USER %s\n", user);
+
     char passwordInput[5+strlen(password)+1];
-    char serverResponse[500];
+    sprintf(passwordInput, "PASS %s\n", password);
 
-    return 0;
-}
+    char serverResponse[MAX_LENGTH];
 
-int handleResponses(const int socket, char *buffer) {
-    return 0;
+    // Write user command to socket
+    if (write(socket, userInput, strlen(userInput)) < 0) {
+        perror("write()");
+        exit(-1);
+    }
+
+    // Read server response
+    if (handleResponses(socket, serverResponse) != SV_PASSWD) {
+        printf("Invalid username '%s'. Aborting.\n", user);
+        exit(-1);
+    }
+
+    // Write password command to socket
+    if (write(socket, passwordInput, strlen(passwordInput)) < 0) {
+        perror("write()");
+        exit(-1);
+    }
+
+    return handleResponses(socket, serverResponse);
 }
 
 int main(int argc, char **argv) {
@@ -134,6 +199,20 @@ int main(int argc, char **argv) {
     printf("Filename: %s\n", url.filename);
     printf("IP: %s\n", url.ip);
 
-    // ... 
+    char serverResponse[MAX_LENGTH];
+
+    // Create Command socket
+    int CommandSocket = createAndConnectSocket(url.ip);
+    if (handleResponses(CommandSocket, serverResponse) != SV_AUTHENTICATE || CommandSocket < 0) {
+        printf("Error connecting to %s. Aborting.\n", url.host);
+        exit(-1);
+    }
+
+    // Attempt to authenticate
+    if (authenticateAndConnect(CommandSocket, url.user, url.passwd) != SV_AUTHSUCCESS) {
+        printf("Error authenticating to %s. Aborting.\n", url.host);
+        exit(-1);
+    }
+
     return 0;
 }

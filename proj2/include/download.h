@@ -10,7 +10,7 @@
 
 #define MAX_LENGTH 500
 
-#define SERVER_PORT 6000
+#define FTP_PORT 21
 #define SERVER_ADDR "192.168.28.96"
 
 #define h_addr h_addr_list[0]
@@ -18,7 +18,7 @@
 // Server responses
 #define SV_AUTHENTICATE 220
 #define SV_PASSWD 331
-#define SV_LOGINSUCCESS 230
+#define SV_AUTHSUCCESS 230
 #define SV_QUIT 221
 #define SV_PASSIVE 227
 #define SV_TRANSFER_START 150
@@ -39,9 +39,8 @@ struct URL {
 };
 
 typedef enum {
-    FTP_START,
-    FTP_END,
-    FTP_SINGLE,
-    FTP_MULTIPLE,
-    FTP_PASSIVE
+    FTP_START_REPLY,
+    FTP_END_REPLY,
+    FTP_SINGLE_LINE,
+    FTP_MULTI_LINE,
 } FTPstate;
