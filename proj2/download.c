@@ -12,7 +12,7 @@ char* getIPAddress(const char* host) {
     return strdup(inet_ntoa(*((struct in_addr *) h->h_addr)));
 }
 
-int createAndConnectSocket(char *ip) {
+int createAndConnectSocket(char *ip, int port) {
     int sockfd;
     struct sockaddr_in server_addr;
 
@@ -20,7 +20,7 @@ int createAndConnectSocket(char *ip) {
     bzero((char *) &server_addr, sizeof(server_addr));
     server_addr.sin_family = AF_INET;
     server_addr.sin_addr.s_addr = inet_addr(ip);    /*32 bit Internet address network byte ordered*/
-    server_addr.sin_port = htons(FTP_PORT);        /*server TCP port must be network byte ordered */
+    server_addr.sin_port = htons(port);        /*server TCP port must be network byte ordered */
 
     /*open a TCP socket*/
     if ((sockfd = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
@@ -41,7 +41,7 @@ int handleResponses(const int socket, char *buffer) {
     
     char byte;
     int i = 0;
-    int respCode = 0;
+    int respCode;
     FTPstate state = FTP_START_REPLY;
 
     memset(buffer, 0, MAX_LENGTH);
@@ -76,9 +76,12 @@ int handleResponses(const int socket, char *buffer) {
             default:
                 break;
         }
+
+        printf("%c", byte);
     }
 
     sscanf(buffer, "%d", &respCode);
+    printf("[SERVER RESPONSE] %d ", respCode);
     return respCode;
 }
 
@@ -101,7 +104,7 @@ int parseURL(const char *url, struct URL *parsed_url) {
     const char *host_start = password_end ? password_end + 1 : user_start;
 
     const char *host_end = strchr(password_start ? password_start : user_start, '/');
-    const char *path_start = host_end ? host_end + 1 : NULL;
+    const char *path_start = host_end ? host_end : NULL;
 
     const char *path_end = strchr(host_start, '\0');
 
@@ -166,6 +169,8 @@ int authenticateAndConnect(const int socket, const char* user, const char* passw
         exit(-1);
     }
 
+    printf("-> Username accepted.\n");
+
     // Write password command to socket
     if (write(socket, passwordInput, strlen(passwordInput)) < 0) {
         perror("write()");
@@ -175,7 +180,117 @@ int authenticateAndConnect(const int socket, const char* user, const char* passw
     return handleResponses(socket, serverResponse);
 }
 
+int enablePassiveMode(const int socket, char *ip, int *port) {
+
+    char serverResponse[MAX_LENGTH];
+
+    // Write passive command to socket
+    if (write(socket, "PASV\n", 5) < 0) {
+        perror("write()");
+        exit(-1);
+    }
+
+    // Read server response
+    if (handleResponses(socket, serverResponse) != SV_PASSIVE) {
+        printf("Error entering passive mode. Aborting.\n");
+        exit(-1);
+    }
+
+    // Parse the IP and port from the server response
+    int ip1, ip2, ip3, ip4, port1, port2;
+    sscanf(serverResponse, "227 Entering Passive Mode (%d,%d,%d,%d,%d,%d)", &ip1, &ip2, &ip3, &ip4, &port1, &port2);
+
+    // Calculate the port
+    *port = port1 * 256 + port2;
+
+    // Generate the IP address
+    sprintf(ip, "%d.%d.%d.%d", ip1, ip2, ip3, ip4);
+
+    return SV_PASSIVE;
+}
+
+int requestAndGetFile(const int CommandSocket, const int DataSocket, char *path, char *filename) {
+    
+    char serverResponse[MAX_LENGTH];
+
+    // Build file command
+    char fileCommand[5+strlen(path)+1];
+    sprintf(fileCommand, "RETR %s\n", path);
+
+    // Write and handle response
+    if (write(CommandSocket, fileCommand, sizeof(fileCommand)) < 0) {
+        perror("write()");
+        exit(-1);
+    }
+    printf("[CLIENT] -> File command sent.\n");
+    
+    if (handleResponses(CommandSocket, serverResponse) != SV_TRANSFER_START) {
+        printf("Unknown path '%s'. Aborting.\n", path);
+        exit(-1);
+    }
+    printf("-> File transfer started.\n");
+
+    // Read file from data socket
+    FILE *file = fopen(filename, "wb");
+    if (file == NULL) {
+        perror("fopen()");
+        exit(-1);
+    }
+
+    char byte;
+    char buffer[MAX_LENGTH];
+    ssize_t bytesRead;
+
+    while ((bytesRead = read(DataSocket, buffer, MAX_LENGTH)) > 0) {
+        if (fwrite(buffer, 1, bytesRead, file) < bytesRead) {
+            perror("fwrite()");
+            exit(-1);
+        }
+    }
+
+    if (bytesRead < 0) {
+        perror("read()");
+        exit(-1);
+    }
+
+    fclose(file);
+
+    // Read server response
+    return handleResponses(CommandSocket, serverResponse);
+}
+
+int CloseConnection(const int CommandSocket, const int DataSocket) {
+    char serverResponse[MAX_LENGTH];
+
+    // Write quit command to socket
+    if (write(CommandSocket, "QUIT\n", 5) < 0) {
+        perror("write()");
+        exit(-1);
+    }
+
+    // Read server response
+    if (handleResponses(CommandSocket, serverResponse) != SV_QUIT) {
+        printf("Error closing connection. Aborting.\n");
+        exit(-1);
+    }
+
+    // Close sockets
+    if (close(CommandSocket) < 0) {
+        perror("close()");
+        exit(-1);
+    }
+
+    if (close(DataSocket) < 0) {
+        perror("close()");
+        exit(-1);
+    }
+
+    return SV_QUIT;
+}
+
 int main(int argc, char **argv) {
+    int port;
+    char ip[16];
 
     // Check if the URL is provided
     if (argc != 2) {
@@ -190,6 +305,7 @@ int main(int argc, char **argv) {
         printf("Usage: ./download ftp://[<user>:<password>@]<host>/<url-path>\n");
         exit(-1);
     }
+    printf("------URL parsed-------\n");
 
     // Print fields
     printf("User: %s\n", url.user);
@@ -199,20 +315,53 @@ int main(int argc, char **argv) {
     printf("Filename: %s\n", url.filename);
     printf("IP: %s\n", url.ip);
 
+    printf("-----------------------\n");
+
     char serverResponse[MAX_LENGTH];
 
     // Create Command socket
-    int CommandSocket = createAndConnectSocket(url.ip);
+    int CommandSocket = createAndConnectSocket(url.ip, FTP_PORT);
     if (handleResponses(CommandSocket, serverResponse) != SV_AUTHENTICATE || CommandSocket < 0) {
-        printf("Error connecting to %s. Aborting.\n", url.host);
+        printf("Error connecting to %s. Aborting (On command socket).\n", url.host);
         exit(-1);
     }
+    printf("-> Command socket created.\n");
 
     // Attempt to authenticate
     if (authenticateAndConnect(CommandSocket, url.user, url.passwd) != SV_AUTHSUCCESS) {
         printf("Error authenticating to %s. Aborting.\n", url.host);
         exit(-1);
     }
+    printf("-> Authenticated.\n");
+
+    // Enable passive mode
+    if (enablePassiveMode(CommandSocket, ip, &port) != SV_PASSIVE) {
+        printf("Error entering passive mode. Aborting.\n");
+        exit(-1);
+    }
+    printf("-> Passive mode enabled.\n");
+
+    // Create Data socket
+    int DataSocket = createAndConnectSocket(ip, port);
+    if (DataSocket < 0) {
+        printf("Error connecting to %s. Aborting (On data socket).\n", url.host);
+        exit(-1);
+    }
+    printf("[CLIENT] -> Data socket created.\n");
+
+    // Request and get file
+    if (requestAndGetFile(CommandSocket, DataSocket, url.path, url.filename) != SV_TRANSFER_COMPLETE) {
+        printf("Error requesting file '%s'. Aborting.\n", url.filename);
+        exit(-1);
+    }
+    printf("-> File '%s' downloaded.\n", url.filename);
+
+    // Close connection
+    if (CloseConnection(CommandSocket, DataSocket) != SV_QUIT) {
+        printf("Error closing connection. Aborting.\n");
+        exit(-1);
+    }
+    printf("-> Connection closed.\n");
 
     return 0;
 }
