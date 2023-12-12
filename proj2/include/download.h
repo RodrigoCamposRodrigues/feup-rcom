@@ -1,3 +1,6 @@
+#ifndef DOWNLOAD_H
+#define DOWNLOAD_H
+
 #include <stdio.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
@@ -6,14 +9,9 @@
 #include <unistd.h>
 #include <netdb.h>
 
-#include <string.h>
-
 #define MAX_LENGTH 500
 
 #define FTP_PORT 21
-#define SERVER_ADDR "192.168.28.96"
-
-#define h_addr h_addr_list[0]
 
 // Server responses
 #define SV_AUTHENTICATE 220
@@ -44,3 +42,29 @@ typedef enum {
     FTP_SINGLE_LINE,
     FTP_MULTI_LINE,
 } FTPstate;
+
+// Function to get IP from hostname
+char* getIPAddress(const char* host);
+
+// Create and connect socket
+int createAndConnectSocket(char *ip, int port);
+
+// Handle replies from server
+int handleResponses(const int socket, char *buffer);
+
+// Parse URL
+int parseURL(const char *url, struct URL *parsed_url);
+
+// Authenticate and connect to the server
+int authenticateAndConnect(const int socket, const char* user, const char* password);
+
+// Enable passive mode for data transfer
+int enablePassiveMode(const int socket, char *ip, int *port);
+
+// Request and get a file from the server
+int requestAndGetFile(const int CommandSocket, const int DataSocket, char *path, char *filename);
+
+// Close the FTP connection
+int CloseConnection(const int CommandSocket, const int DataSocket);
+
+#endif  // DOWNLOAD_H
