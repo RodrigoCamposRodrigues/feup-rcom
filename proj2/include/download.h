@@ -8,10 +8,13 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <netdb.h>
+#include <string.h>
 
 #define MAX_LENGTH 500
 
 #define FTP_PORT 21
+
+#define h_addr h_addr_list[0]
 
 // Server responses
 #define SV_AUTHENTICATE 220
