@@ -241,7 +241,7 @@ int requestAndGetFile(const int CommandSocket, const int DataSocket, char *path,
     char buffer[MAX_DOWNLOAD_SIZE];
     ssize_t bytesRead;
 
-    while ((bytesRead = read(DataSocket, buffer, MAX_LENGTH)) > 0) {
+    while ((bytesRead = read(DataSocket, buffer, MAX_DOWNLOAD_SIZE)) > 0) {
         if (fwrite(buffer, 1, bytesRead, file) < bytesRead) {
             perror("fwrite()");
             exit(-1);
