@@ -238,7 +238,7 @@ int requestAndGetFile(const int CommandSocket, const int DataSocket, char *path,
     }
 
     char byte;
-    char buffer[MAX_LENGTH];
+    char buffer[MAX_DOWNLOAD_SIZE];
     ssize_t bytesRead;
 
     while ((bytesRead = read(DataSocket, buffer, MAX_LENGTH)) > 0) {

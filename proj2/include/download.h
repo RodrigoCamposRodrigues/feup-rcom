@@ -11,6 +11,7 @@
 #include <string.h>
 
 #define MAX_LENGTH 500
+#define MAX_DOWNLOAD_SIZE 1000000
 
 #define FTP_PORT 21
 
