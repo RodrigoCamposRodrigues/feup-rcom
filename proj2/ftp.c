@@ -1,4 +1,4 @@
-#include "include/download.h"
+#include "include/ftp.h"
 
 // Function to get IP from hostname
 char* getIPAddress(const char* host) {

@@ -1,5 +1,5 @@
-#ifndef DOWNLOAD_H
-#define DOWNLOAD_H
+#ifndef FTP_H
+#define FTP_H
 
 #include <stdio.h>
 #include <sys/socket.h>
@@ -71,4 +71,4 @@ int requestAndGetFile(const int CommandSocket, const int DataSocket, char *path,
 // Close the FTP connection
 int CloseConnection(const int CommandSocket, const int DataSocket);
 
-#endif  // DOWNLOAD_H
+#endif  // FTP_H
