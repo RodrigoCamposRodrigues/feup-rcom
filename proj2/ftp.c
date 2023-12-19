@@ -111,12 +111,18 @@ int parseURL(const char *url, struct URL *parsed_url) {
     const char *last_slash = strrchr(path_start ? path_start : host_start, '/');
     const char *filename_start = last_slash ? last_slash + 1 : path_start;
 
+    if (host_end == NULL || path_end == NULL || filename_start == NULL) {
+        printf("Invalid URL\n");
+        return -1;
+    }
+
     // Extract components
     size_t user_len = user_end ? user_end - user_start : 0;
     size_t password_len = password_end ? password_end - password_start : 0;
     size_t host_len = host_end ? host_end - host_start : 0;
     size_t path_len = path_end ? path_end - path_start : 0;
-    size_t filename_len = strlen(filename_start);
+    size_t filename_len = path_end ? path_end - filename_start : 0;
+
 
     strncpy(parsed_url->user, user_start, user_len);
     parsed_url->user[user_len] = '\0';
