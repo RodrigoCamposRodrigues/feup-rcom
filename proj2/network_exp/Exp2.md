@@ -43,7 +43,7 @@
    $ ping 172.16.40.254
    $ ping 172.16.41.1
    ```
-![Alt text](/img/exp2-ping-tux43-to-44-and-42.png)
+![Alt text](../img/exp2-ping-tux43-to-44-and-42.png)
 
 9. Começar captura do eth0 no Tux43. No Tux43, executar o seguinte comando e observar e guardar os resultados:
 
