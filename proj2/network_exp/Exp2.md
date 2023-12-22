@@ -50,7 +50,7 @@
    ```bash
    $ ping -b 172.16.40.255
    ``` 
-![Alt text](/img/exp2-ping-broadcast-from-tux43.png)
+![Alt text](../img/exp2-ping-broadcast-from-tux43.png)
 
 10. Começar captura do eth0 no Tux42. No Tux42, executar o seguinte comando e observar e guardar os resultados:
 
@@ -58,4 +58,4 @@
    $ ping -b 172.16.41.255
    ``` 
 
-![Alt text](/img/exp2-ping-broadcast-from-tux42.png)
+![Alt text](../img/exp2-ping-broadcast-from-tux42.png)

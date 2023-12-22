@@ -39,4 +39,4 @@
      ```
 9. Parar a captura dos resultados e avaliar os logs obtidos com o WireShark.
  
-   ![Captura Experiência 1](/img/exp1.png)
+   ![Captura Experiência 1](../img/exp1.png)

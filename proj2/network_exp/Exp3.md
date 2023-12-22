@@ -39,7 +39,7 @@ Ping do Tux43 para o Tux44_eth0
      ping 172.16.40.254
  ```
 
-![Alt text](/img/exp3-ping-tux43-to-tux44eth0.png)
+![Alt text](../img/exp3-ping-tux43-to-tux44eth0.png)
 
 Ping do Tux43 para o Tux44_eth1
 
@@ -47,7 +47,7 @@ Ping do Tux43 para o Tux44_eth1
    ping 172.16.41.253
 ```
 
-![Alt text](/img/exp3-ping-tux43-to-tux44eth1.png)
+![Alt text](../img/exp3-ping-tux43-to-tux44eth1.png)
 
 Ping do Tux43 para o Tux42_eth0
 
@@ -55,7 +55,7 @@ Ping do Tux43 para o Tux42_eth0
    ping 172.16.41.1
 ```
 
-![Alt text](/img/exp3-ping-tux43-to-tux42.png)
+![Alt text](../img/exp3-ping-tux43-to-tux42.png)
 
 7. Começar captura do eth0 e eth1 do Tux44 no Wireshark
  
@@ -72,7 +72,7 @@ Ping do Tux43 para o Tux42_eth0
       ping 172.16.41.1
    ```
 Tux44_eth0:
-![Alt text](/img/exp3-tux44-eth0.png)
+![Alt text](../img/exp3-tux44-eth0.png)
 
 Tux44_eth1:
-![Alt text](/img/exp3-ping-tux43-to-tux44eth1.png)
+![Alt text](../img/exp3-ping-tux43-to-tux44eth1.png)
